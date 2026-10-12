@@ -1,0 +1,34 @@
+{
+  "source": "OurAirports",
+  "url": "https://davidmegginson.github.io/ourairports-data/airports.csv",
+  "licence": "Public domain (OurAirports data dedication)",
+  "retrieved_at_utc": "2026-10-12T18:24:49.182546+00:00",
+  "full_file_sha256": "eb99a7ca14a63612b82d1c33694b2f8963b7cc42b7a6128142e8f1b9c5be23e5",
+  "full_file_rows": 86236,
+  "subset_rows": 19,
+  "requested_icao": [
+    "VIDP",
+    "VABB",
+    "VOBL",
+    "VOMM",
+    "VOHS",
+    "VECC",
+    "VAAH",
+    "VAPO",
+    "VOGO",
+    "VIJP",
+    "VILK",
+    "VANP",
+    "VABP",
+    "VOCI",
+    "VEBS",
+    "VAID",
+    "VIAR",
+    "VEGT",
+    "VOTV",
+    "VERP"
+  ],
+  "missing_icao": [
+    "VERP"
+  ]
+}

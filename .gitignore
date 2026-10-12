@@ -1,0 +1,78 @@
+# =============================================================================
+# API Keys, Credentials, Tokens & Environment Secrets (NEVER COMMIT)
+# =============================================================================
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+*credentials*.json
+*secret*
+*token*.json
+*api_key*
+*.pem
+*.key
+
+# =============================================================================
+# External API Caches, Local Databases & Generated Datasets
+# =============================================================================
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+data/raw/
+data/interim/
+data/processed/
+data/synthetic/
+data/cache/
+*api_cache*
+!data/reference/
+!data/reference/airports_subset.csv
+!data/reference/airports_subset.meta.json
+
+# =============================================================================
+# Python / Virtual Environments / Packaging
+# =============================================================================
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.installed.cfg
+*.egg
+build/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# =============================================================================
+# Machine Learning Artifacts (local large binaries)
+# =============================================================================
+*.joblib
+*.pkl
+
+# =============================================================================
+# Frontend / Node
+# =============================================================================
+node_modules/
+frontend/dist/
+frontend/build/
+*.tsbuildinfo
+
+# =============================================================================
+# OS / IDE files
+# =============================================================================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo

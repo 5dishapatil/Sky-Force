@@ -1,0 +1,20 @@
+ident,type,name,latitude_deg,longitude_deg,elevation_ft,iso_country,municipality,gps_code,iata_code
+VAAH,large_airport,Sardar Vallabh Patel International Airport,23.0772,72.634697,189.0,IN,Ahmedabad,VAAH,AMD
+VABB,large_airport,Chhatrapati Shivaji Maharaj International Airport,19.088699,72.867897,39.0,IN,Mumbai,VABB,BOM
+VABP,large_airport,Raja Bhoj International Airport,23.2875,77.337402,1711.0,IN,Bhopal,VABP,BHO
+VAID,large_airport,Devi Ahilya Bai Holkar International Airport,22.721404,75.80051,1850.0,IN,Indore,VAID,IDR
+VANP,large_airport,Dr. Babasaheb Ambedkar International Airport,21.092199,79.047203,1033.0,IN,Nagpur,VANP,NAG
+VAPO,large_airport,Pune International Airport,18.5821,73.919701,1942.0,IN,Pune,VAPO,PNQ
+VEBS,large_airport,Biju Patnaik International Airport,20.251021,85.814747,138.0,IN,Bhubaneswar,VEBS,BBI
+VECC,large_airport,Netaji Subhash Chandra Bose International Airport,22.654012,88.44765,16.0,IN,Kolkata,VECC,CCU
+VEGT,large_airport,Lokpriya Gopinath Bordoloi International Airport,26.106654,91.585226,162.0,IN,Guwahati,VEGT,GAU
+VIAR,large_airport,Sri Guru Ram Das Ji International Airport,31.7096,74.797302,756.0,IN,Amritsar,VIAR,ATQ
+VIDP,large_airport,Indira Gandhi International Airport,28.55563,77.09519,777.0,IN,New Delhi,VIDP,DEL
+VIJP,large_airport,Jaipur International Airport,26.8242,75.812202,1263.0,IN,Jaipur,VIJP,JAI
+VILK,large_airport,Chaudhary Charan Singh International Airport,26.760599,80.889297,410.0,IN,Lucknow,VILK,LKO
+VOBL,large_airport,Kempegowda International Airport Bengaluru,13.1979,77.706299,3000.0,IN,Bengaluru,VOBL,BLR
+VOCI,large_airport,Cochin International Airport,10.151047,76.400838,30.0,IN,Kochi,VOCI,COK
+VOGO,large_airport,Goa Dabolim International Airport,15.380062,73.833328,150.0,IN,Vasco da Gama,VOGO,GOI
+VOHS,large_airport,Rajiv Gandhi International Airport,17.231318,78.429855,2024.0,IN,Hyderabad,VOHS,HYD
+VOMM,large_airport,Chennai International Airport,12.990005,80.169296,52.0,IN,Chennai,VOMM,MAA
+VOTV,large_airport,Thiruvananthapuram International Airport,8.481889,76.920029,15.0,IN,Thiruvananthapuram,VOTV,TRV
