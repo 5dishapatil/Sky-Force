@@ -1,0 +1,427 @@
+{
+  "heuristic_distance_over_speed": {
+    "assumption": "distance / 780 km/h (not fitted)",
+    "validation": {
+      "n": 2105,
+      "mae_min": 3.3629557380133708,
+      "rmse_min": 4.408829089387981,
+      "r2": 0.5103774455455448,
+      "bias_min": -2.1477161584821425,
+      "abs_error_histogram": [
+        {
+          "bin_min": "0-0.5",
+          "count": 203
+        },
+        {
+          "bin_min": "0.5-1",
+          "count": 239
+        },
+        {
+          "bin_min": "1-2",
+          "count": 425
+        },
+        {
+          "bin_min": "2-3",
+          "count": 346
+        },
+        {
+          "bin_min": "3-5",
+          "count": 381
+        },
+        {
+          "bin_min": "5-8",
+          "count": 315
+        },
+        {
+          "bin_min": "8-12",
+          "count": 176
+        },
+        {
+          "bin_min": "12-inf",
+          "count": 20
+        }
+      ]
+    },
+    "test": {
+      "n": 4356,
+      "mae_min": 3.394805506782247,
+      "rmse_min": 4.56158228024045,
+      "r2": 0.48659874481981635,
+      "bias_min": -2.349199745413391,
+      "abs_error_histogram": [
+        {
+          "bin_min": "0-0.5",
+          "count": 497
+        },
+        {
+          "bin_min": "0.5-1",
+          "count": 509
+        },
+        {
+          "bin_min": "1-2",
+          "count": 870
+        },
+        {
+          "bin_min": "2-3",
+          "count": 687
+        },
+        {
+          "bin_min": "3-5",
+          "count": 734
+        },
+        {
+          "bin_min": "5-8",
+          "count": 600
+        },
+        {
+          "bin_min": "8-12",
+          "count": 388
+        },
+        {
+          "bin_min": "12-inf",
+          "count": 71
+        }
+      ]
+    }
+  },
+  "median_baseline": {
+    "fit_seconds": 0.02,
+    "validation": {
+      "n": 2105,
+      "mae_min": 5.062664354351524,
+      "rmse_min": 6.348906503123152,
+      "r2": -0.015342935339250241,
+      "bias_min": -0.7804530518411716,
+      "abs_error_histogram": [
+        {
+          "bin_min": "0-0.5",
+          "count": 122
+        },
+        {
+          "bin_min": "0.5-1",
+          "count": 126
+        },
+        {
+          "bin_min": "1-2",
+          "count": 249
+        },
+        {
+          "bin_min": "2-3",
+          "count": 233
+        },
+        {
+          "bin_min": "3-5",
+          "count": 474
+        },
+        {
+          "bin_min": "5-8",
+          "count": 486
+        },
+        {
+          "bin_min": "8-12",
+          "count": 295
+        },
+        {
+          "bin_min": "12-inf",
+          "count": 120
+        }
+      ]
+    },
+    "test": {
+      "n": 4356,
+      "mae_min": 5.120768517004009,
+      "rmse_min": 6.43112987861391,
+      "r2": -0.020470515223796948,
+      "bias_min": -0.9108595931387669,
+      "abs_error_histogram": [
+        {
+          "bin_min": "0-0.5",
+          "count": 278
+        },
+        {
+          "bin_min": "0.5-1",
+          "count": 264
+        },
+        {
+          "bin_min": "1-2",
+          "count": 530
+        },
+        {
+          "bin_min": "2-3",
+          "count": 423
+        },
+        {
+          "bin_min": "3-5",
+          "count": 958
+        },
+        {
+          "bin_min": "5-8",
+          "count": 1005
+        },
+        {
+          "bin_min": "8-12",
+          "count": 640
+        },
+        {
+          "bin_min": "12-inf",
+          "count": 258
+        }
+      ]
+    }
+  },
+  "ridge": {
+    "fit_seconds": 0.02,
+    "validation": {
+      "n": 2105,
+      "mae_min": 1.7619755287281362,
+      "rmse_min": 2.2958714261157427,
+      "r2": 0.8672269247764047,
+      "bias_min": 0.015858807621541255,
+      "abs_error_histogram": [
+        {
+          "bin_min": "0-0.5",
+          "count": 480
+        },
+        {
+          "bin_min": "0.5-1",
+          "count": 373
+        },
+        {
+          "bin_min": "1-2",
+          "count": 446
+        },
+        {
+          "bin_min": "2-3",
+          "count": 394
+        },
+        {
+          "bin_min": "3-5",
+          "count": 347
+        },
+        {
+          "bin_min": "5-8",
+          "count": 62
+        },
+        {
+          "bin_min": "8-12",
+          "count": 3
+        },
+        {
+          "bin_min": "12-inf",
+          "count": 0
+        }
+      ]
+    },
+    "test": {
+      "n": 4356,
+      "mae_min": 1.786649838253726,
+      "rmse_min": 2.331885028804104,
+      "r2": 0.8658347115795056,
+      "bias_min": -0.07378369728759251,
+      "abs_error_histogram": [
+        {
+          "bin_min": "0-0.5",
+          "count": 959
+        },
+        {
+          "bin_min": "0.5-1",
+          "count": 788
+        },
+        {
+          "bin_min": "1-2",
+          "count": 949
+        },
+        {
+          "bin_min": "2-3",
+          "count": 798
+        },
+        {
+          "bin_min": "3-5",
+          "count": 703
+        },
+        {
+          "bin_min": "5-8",
+          "count": 148
+        },
+        {
+          "bin_min": "8-12",
+          "count": 11
+        },
+        {
+          "bin_min": "12-inf",
+          "count": 0
+        }
+      ]
+    }
+  },
+  "random_forest": {
+    "fit_seconds": 0.76,
+    "validation": {
+      "n": 2105,
+      "mae_min": 0.870453321698682,
+      "rmse_min": 1.5290668434934733,
+      "r2": 0.9411064368503403,
+      "bias_min": 0.00039600571840051394,
+      "abs_error_histogram": [
+        {
+          "bin_min": "0-0.5",
+          "count": 1214
+        },
+        {
+          "bin_min": "0.5-1",
+          "count": 366
+        },
+        {
+          "bin_min": "1-2",
+          "count": 269
+        },
+        {
+          "bin_min": "2-3",
+          "count": 113
+        },
+        {
+          "bin_min": "3-5",
+          "count": 97
+        },
+        {
+          "bin_min": "5-8",
+          "count": 42
+        },
+        {
+          "bin_min": "8-12",
+          "count": 4
+        },
+        {
+          "bin_min": "12-inf",
+          "count": 0
+        }
+      ]
+    },
+    "test": {
+      "n": 4356,
+      "mae_min": 0.9608385704863095,
+      "rmse_min": 1.6007029153111054,
+      "r2": 0.9367810363614436,
+      "bias_min": -0.11338200915218478,
+      "abs_error_histogram": [
+        {
+          "bin_min": "0-0.5",
+          "count": 2201
+        },
+        {
+          "bin_min": "0.5-1",
+          "count": 874
+        },
+        {
+          "bin_min": "1-2",
+          "count": 685
+        },
+        {
+          "bin_min": "2-3",
+          "count": 295
+        },
+        {
+          "bin_min": "3-5",
+          "count": 206
+        },
+        {
+          "bin_min": "5-8",
+          "count": 83
+        },
+        {
+          "bin_min": "8-12",
+          "count": 11
+        },
+        {
+          "bin_min": "12-inf",
+          "count": 1
+        }
+      ]
+    }
+  },
+  "hist_gradient_boosting": {
+    "fit_seconds": 0.84,
+    "validation": {
+      "n": 2105,
+      "mae_min": 0.9204568585497116,
+      "rmse_min": 1.5540534388812164,
+      "r2": 0.939165942239711,
+      "bias_min": -0.00927030751019564,
+      "abs_error_histogram": [
+        {
+          "bin_min": "0-0.5",
+          "count": 1108
+        },
+        {
+          "bin_min": "0.5-1",
+          "count": 460
+        },
+        {
+          "bin_min": "1-2",
+          "count": 256
+        },
+        {
+          "bin_min": "2-3",
+          "count": 133
+        },
+        {
+          "bin_min": "3-5",
+          "count": 105
+        },
+        {
+          "bin_min": "5-8",
+          "count": 38
+        },
+        {
+          "bin_min": "8-12",
+          "count": 5
+        },
+        {
+          "bin_min": "12-inf",
+          "count": 0
+        }
+      ]
+    },
+    "test": {
+      "n": 4356,
+      "mae_min": 0.9953843031494233,
+      "rmse_min": 1.602158578436712,
+      "r2": 0.9366660027010868,
+      "bias_min": -0.04485050259961153,
+      "abs_error_histogram": [
+        {
+          "bin_min": "0-0.5",
+          "count": 2062
+        },
+        {
+          "bin_min": "0.5-1",
+          "count": 969
+        },
+        {
+          "bin_min": "1-2",
+          "count": 706
+        },
+        {
+          "bin_min": "2-3",
+          "count": 318
+        },
+        {
+          "bin_min": "3-5",
+          "count": 200
+        },
+        {
+          "bin_min": "5-8",
+          "count": 90
+        },
+        {
+          "bin_min": "8-12",
+          "count": 10
+        },
+        {
+          "bin_min": "12-inf",
+          "count": 1
+        }
+      ]
+    }
+  }
+}

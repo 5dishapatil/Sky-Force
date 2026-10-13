@@ -1,0 +1,20 @@
+{
+  "congestion": {
+    "version": "v20261013T100721Z",
+    "model": "random_forest",
+    "test": {
+      "accuracy": 0.8470498264603801,
+      "balanced_accuracy": 0.7139041150064962,
+      "macro_f1": 0.6359324095553648
+    }
+  },
+  "eta": {
+    "version": "v20261013T100731Z",
+    "model": "random_forest",
+    "test": {
+      "mae_min": 0.9608385704863095,
+      "rmse_min": 1.6007029153111054,
+      "r2": 0.9367810363614436
+    }
+  }
+}

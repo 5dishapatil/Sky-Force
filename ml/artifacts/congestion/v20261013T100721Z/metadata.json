@@ -1,0 +1,1129 @@
+{
+  "model_name": "random_forest",
+  "task": "3-class research congestion proxy for the NEXT window",
+  "target_definition": {
+    "target": "next_window_class",
+    "source_column": "next_window_count",
+    "description": "unique-aircraft count in the same research cell during the next window, bucketed by thresholds",
+    "thresholds": {
+      "low_max": 2,
+      "medium_max": 4,
+      "method": "quantiles of occupied (count>=1) training windows: q50 / q85"
+    },
+    "window_minutes": 15,
+    "note": "Research traffic-density proxy - NOT an official ATC capacity/congestion classification."
+  },
+  "feature_schema": {
+    "features": [
+      "cell_id",
+      "hour_sin",
+      "hour_cos",
+      "aircraft_count",
+      "count_lag1",
+      "count_lag2",
+      "count_lag4",
+      "count_roll4_mean",
+      "traffic_change",
+      "neighbor_count",
+      "neighbor_count_lag1",
+      "mean_speed_mps",
+      "speed_std_mps",
+      "mean_altitude_m",
+      "wind_speed_10m_ms",
+      "wind_dir_sin",
+      "wind_dir_cos",
+      "precipitation_mm",
+      "cloud_cover_pct",
+      "wind_gusts_10m_ms",
+      "weather_missing"
+    ],
+    "numeric": [
+      "hour_sin",
+      "hour_cos",
+      "aircraft_count",
+      "count_lag1",
+      "count_lag2",
+      "count_lag4",
+      "count_roll4_mean",
+      "traffic_change",
+      "neighbor_count",
+      "neighbor_count_lag1",
+      "mean_speed_mps",
+      "speed_std_mps",
+      "mean_altitude_m",
+      "wind_speed_10m_ms",
+      "wind_dir_sin",
+      "wind_dir_cos",
+      "precipitation_mm",
+      "cloud_cover_pct",
+      "wind_gusts_10m_ms",
+      "weather_missing"
+    ],
+    "categorical": [
+      "cell_id"
+    ],
+    "categories": {
+      "cell_id": [
+        "R01C03",
+        "R01C04",
+        "R01C05",
+        "R01C06",
+        "R02C03",
+        "R02C04",
+        "R02C05",
+        "R02C06",
+        "R02C07",
+        "R03C02",
+        "R03C03",
+        "R03C04",
+        "R03C05",
+        "R03C06",
+        "R03C07",
+        "R03C08",
+        "R04C02",
+        "R04C03",
+        "R04C04",
+        "R04C05",
+        "R04C06",
+        "R04C07",
+        "R04C08",
+        "R05C02",
+        "R05C03",
+        "R05C05",
+        "R05C06",
+        "R05C07",
+        "R06C02",
+        "R06C03",
+        "R06C04",
+        "R06C05",
+        "R06C06",
+        "R06C09",
+        "R06C10",
+        "R06C11",
+        "R06C12",
+        "R07C02",
+        "R07C03",
+        "R07C04",
+        "R07C05",
+        "R07C06",
+        "R07C07",
+        "R07C08",
+        "R07C09",
+        "R07C10",
+        "R07C11",
+        "R07C12",
+        "R08C02",
+        "R08C03",
+        "R08C04",
+        "R08C05",
+        "R08C06",
+        "R08C07",
+        "R08C08",
+        "R08C09",
+        "R08C10",
+        "R08C11",
+        "R08C12",
+        "R09C02",
+        "R09C03",
+        "R09C04",
+        "R09C05",
+        "R09C06",
+        "R09C07",
+        "R09C08",
+        "R09C09",
+        "R09C10",
+        "R09C11",
+        "R09C12",
+        "R10C03",
+        "R10C04",
+        "R10C05",
+        "R10C06",
+        "R10C07",
+        "R10C08",
+        "R10C10",
+        "R10C11",
+        "R10C12",
+        "R11C03",
+        "R11C04",
+        "R11C05",
+        "R11C06",
+        "R11C07",
+        "R11C08",
+        "R12C03",
+        "R12C04",
+        "R12C05",
+        "R12C06"
+      ]
+    }
+  },
+  "splits": {
+    "train": [
+      "2026-01-15T00:00:00+00:00",
+      "2026-01-20T00:00:00+00:00"
+    ],
+    "validation": [
+      "2026-01-20T00:00:00+00:00",
+      "2026-01-21T00:00:00+00:00"
+    ],
+    "test": [
+      "2026-01-21T00:00:00+00:00",
+      "2026-01-23T00:00:00+00:00"
+    ],
+    "method": "chronological; rows whose target window crosses a boundary are purged"
+  },
+  "rows": {
+    "train": 42631,
+    "validation": 8455,
+    "test": 16999,
+    "excluded_missing_target": 89
+  },
+  "class_distribution": {
+    "train": {
+      "LOW": 37708,
+      "MEDIUM": 3587,
+      "HIGH": 1336
+    },
+    "val": {
+      "LOW": 7493,
+      "MEDIUM": 680,
+      "HIGH": 282
+    },
+    "test": {
+      "LOW": 15009,
+      "MEDIUM": 1387,
+      "HIGH": 603
+    }
+  },
+  "selection": {
+    "criterion": "validation macro-F1",
+    "candidates": [
+      "dummy_most_frequent",
+      "logistic_regression",
+      "random_forest",
+      "hist_gradient_boosting"
+    ]
+  },
+  "metrics": {
+    "dummy_most_frequent": {
+      "fit_seconds": 0.11,
+      "validation": {
+        "n": 8455,
+        "accuracy": 0.88622117090479,
+        "balanced_accuracy": 0.3333333333333333,
+        "macro_f1": 0.31322631886965974,
+        "per_class": {
+          "LOW": {
+            "precision": 0.88622117090479,
+            "recall": 1.0,
+            "f1": 0.9396789566089792,
+            "support": 7493
+          },
+          "MEDIUM": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 680
+          },
+          "HIGH": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 282
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "matrix": [
+            [
+              7493,
+              0,
+              0
+            ],
+            [
+              680,
+              0,
+              0
+            ],
+            [
+              282,
+              0,
+              0
+            ]
+          ]
+        },
+        "brier_multiclass": 0.22755765819041987,
+        "roc_auc_ovr_macro": 0.5
+      },
+      "test": {
+        "n": 16999,
+        "accuracy": 0.8829342902523678,
+        "balanced_accuracy": 0.3333333333333333,
+        "macro_f1": 0.31260934766308424,
+        "per_class": {
+          "LOW": {
+            "precision": 0.8829342902523678,
+            "recall": 1.0,
+            "f1": 0.9378280429892527,
+            "support": 15009
+          },
+          "MEDIUM": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 1387
+          },
+          "HIGH": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 603
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "matrix": [
+            [
+              15009,
+              0,
+              0
+            ],
+            [
+              1387,
+              0,
+              0
+            ],
+            [
+              603,
+              0,
+              0
+            ]
+          ]
+        },
+        "brier_multiclass": 0.23413141949526442,
+        "roc_auc_ovr_macro": 0.5
+      },
+      "params": {
+        "constant": null,
+        "random_state": null,
+        "strategy": "most_frequent"
+      }
+    },
+    "logistic_regression": {
+      "fit_seconds": 3.67,
+      "validation": {
+        "n": 8455,
+        "accuracy": 0.8281490242460082,
+        "balanced_accuracy": 0.7253803392228333,
+        "macro_f1": 0.6087741804053138,
+        "per_class": {
+          "LOW": {
+            "precision": 0.9918889408828576,
+            "recall": 0.8486587481649539,
+            "f1": 0.9147008055235903,
+            "support": 7493
+          },
+          "MEDIUM": {
+            "precision": 0.28615960099750626,
+            "recall": 0.675,
+            "f1": 0.4019264448336252,
+            "support": 680
+          },
+          "HIGH": {
+            "precision": 0.41818181818181815,
+            "recall": 0.6524822695035462,
+            "f1": 0.5096952908587258,
+            "support": 282
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "matrix": [
+            [
+              6359,
+              1048,
+              86
+            ],
+            [
+              51,
+              459,
+              170
+            ],
+            [
+              1,
+              97,
+              184
+            ]
+          ]
+        },
+        "brier_multiclass": 0.2235263764321317,
+        "roc_auc_ovr_macro": 0.9367012498810915
+      },
+      "test": {
+        "n": 16999,
+        "accuracy": 0.8336372727807518,
+        "balanced_accuracy": 0.7438781107866467,
+        "macro_f1": 0.6169798751135781,
+        "per_class": {
+          "LOW": {
+            "precision": 0.9915959907478797,
+            "recall": 0.8568858684789127,
+            "f1": 0.9193323564101648,
+            "support": 15009
+          },
+          "MEDIUM": {
+            "precision": 0.29133858267716534,
+            "recall": 0.6135544340302812,
+            "f1": 0.39507892293407615,
+            "support": 1387
+          },
+          "HIGH": {
+            "precision": 0.41425992779783394,
+            "recall": 0.7611940298507462,
+            "f1": 0.5365283459964932,
+            "support": 603
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "matrix": [
+            [
+              12861,
+              1932,
+              216
+            ],
+            [
+              103,
+              851,
+              433
+            ],
+            [
+              6,
+              138,
+              459
+            ]
+          ]
+        },
+        "brier_multiclass": 0.2205638139770681,
+        "roc_auc_ovr_macro": 0.9353990186048108
+      },
+      "params": {
+        "C": 1.0,
+        "class_weight": "balanced",
+        "dual": false,
+        "fit_intercept": true,
+        "intercept_scaling": 1,
+        "l1_ratio": 0.0,
+        "max_iter": 3000,
+        "n_jobs": null,
+        "penalty": "deprecated",
+        "random_state": null,
+        "solver": "lbfgs",
+        "tol": 0.0001,
+        "verbose": 0,
+        "warm_start": false
+      }
+    },
+    "random_forest": {
+      "fit_seconds": 1.28,
+      "validation": {
+        "n": 8455,
+        "accuracy": 0.8369012418687167,
+        "balanced_accuracy": 0.7074249362446716,
+        "macro_f1": 0.6251281770577125,
+        "per_class": {
+          "LOW": {
+            "precision": 0.9857449417535254,
+            "recall": 0.8582677165354331,
+            "f1": 0.9176000570735535,
+            "support": 7493
+          },
+          "MEDIUM": {
+            "precision": 0.3000608642726719,
+            "recall": 0.725,
+            "f1": 0.4244511407662505,
+            "support": 680
+          },
+          "HIGH": {
+            "precision": 0.5277777777777778,
+            "recall": 0.5390070921985816,
+            "f1": 0.5333333333333333,
+            "support": 282
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "matrix": [
+            [
+              6431,
+              1022,
+              40
+            ],
+            [
+              91,
+              493,
+              96
+            ],
+            [
+              2,
+              128,
+              152
+            ]
+          ]
+        },
+        "brier_multiclass": 0.1977042673556839,
+        "roc_auc_ovr_macro": 0.9355003614200873
+      },
+      "test": {
+        "n": 16999,
+        "accuracy": 0.8470498264603801,
+        "balanced_accuracy": 0.7139041150064962,
+        "macro_f1": 0.6359324095553648,
+        "per_class": {
+          "LOW": {
+            "precision": 0.9858220211161388,
+            "recall": 0.8709441002065428,
+            "f1": 0.9248293183345715,
+            "support": 15009
+          },
+          "MEDIUM": {
+            "precision": 0.31958762886597936,
+            "recall": 0.71521268925739,
+            "f1": 0.4417724337564017,
+            "support": 1387
+          },
+          "HIGH": {
+            "precision": 0.5275590551181102,
+            "recall": 0.5555555555555556,
+            "f1": 0.5411954765751211,
+            "support": 603
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "matrix": [
+            [
+              13072,
+              1853,
+              84
+            ],
+            [
+              179,
+              992,
+              216
+            ],
+            [
+              9,
+              259,
+              335
+            ]
+          ]
+        },
+        "brier_multiclass": 0.18850304096405268,
+        "roc_auc_ovr_macro": 0.9408574771500179
+      },
+      "params": {
+        "bootstrap": true,
+        "ccp_alpha": 0.0,
+        "class_weight": "balanced_subsample",
+        "criterion": "gini",
+        "max_depth": 16,
+        "max_features": "sqrt",
+        "max_leaf_nodes": null,
+        "max_samples": null,
+        "min_impurity_decrease": 0.0,
+        "min_samples_leaf": 3,
+        "min_samples_split": 2,
+        "min_weight_fraction_leaf": 0.0,
+        "monotonic_cst": null,
+        "n_estimators": 200,
+        "n_jobs": -1,
+        "oob_score": false,
+        "random_state": 20260115,
+        "verbose": 0,
+        "warm_start": false
+      }
+    },
+    "hist_gradient_boosting": {
+      "fit_seconds": 12.17,
+      "validation": {
+        "n": 8455,
+        "accuracy": 0.8581904198698994,
+        "balanced_accuracy": 0.6682273631071566,
+        "macro_f1": 0.6106276934088308,
+        "per_class": {
+          "LOW": {
+            "precision": 0.9796008218373936,
+            "recall": 0.8908314426798345,
+            "f1": 0.9331096665967709,
+            "support": 7493
+          },
+          "MEDIUM": {
+            "precision": 0.33211944646758923,
+            "recall": 0.6705882352941176,
+            "f1": 0.44422795908426693,
+            "support": 680
+          },
+          "HIGH": {
+            "precision": 0.4664179104477612,
+            "recall": 0.4432624113475177,
+            "f1": 0.45454545454545453,
+            "support": 282
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "matrix": [
+            [
+              6675,
+              770,
+              48
+            ],
+            [
+              129,
+              456,
+              95
+            ],
+            [
+              10,
+              147,
+              125
+            ]
+          ]
+        },
+        "brier_multiclass": 0.1832333460218825,
+        "roc_auc_ovr_macro": 0.9394778024497471
+      },
+      "test": {
+        "n": 16999,
+        "accuracy": 0.8710512383081358,
+        "balanced_accuracy": 0.6864565038277345,
+        "macro_f1": 0.6334247338097312,
+        "per_class": {
+          "LOW": {
+            "precision": 0.978648454349389,
+            "recall": 0.9069891398494236,
+            "f1": 0.9414571734845604,
+            "support": 15009
+          },
+          "MEDIUM": {
+            "precision": 0.3615888615888616,
+            "recall": 0.6366258111031002,
+            "f1": 0.46121702794463304,
+            "support": 1387
+          },
+          "HIGH": {
+            "precision": 0.4806800618238022,
+            "recall": 0.5157545605306799,
+            "f1": 0.4976,
+            "support": 603
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "matrix": [
+            [
+              13613,
+              1292,
+              104
+            ],
+            [
+              272,
+              883,
+              232
+            ],
+            [
+              25,
+              267,
+              311
+            ]
+          ]
+        },
+        "brier_multiclass": 0.17004979871577672,
+        "roc_auc_ovr_macro": 0.943435278936795
+      },
+      "params": {
+        "categorical_features": "from_dtype",
+        "class_weight": "balanced",
+        "early_stopping": false,
+        "interaction_cst": null,
+        "l2_regularization": 0.0,
+        "learning_rate": 0.08,
+        "loss": "log_loss",
+        "max_bins": 255,
+        "max_depth": null,
+        "max_features": 1.0,
+        "max_iter": 250,
+        "max_leaf_nodes": 31,
+        "min_samples_leaf": 20,
+        "monotonic_cst": null,
+        "n_iter_no_change": 10,
+        "random_state": 20260115,
+        "scoring": "loss",
+        "tol": 1e-07,
+        "validation_fraction": 0.1,
+        "verbose": 0,
+        "warm_start": false
+      }
+    }
+  },
+  "selected_test_metrics": {
+    "n": 16999,
+    "accuracy": 0.8470498264603801,
+    "balanced_accuracy": 0.7139041150064962,
+    "macro_f1": 0.6359324095553648,
+    "per_class": {
+      "LOW": {
+        "precision": 0.9858220211161388,
+        "recall": 0.8709441002065428,
+        "f1": 0.9248293183345715,
+        "support": 15009
+      },
+      "MEDIUM": {
+        "precision": 0.31958762886597936,
+        "recall": 0.71521268925739,
+        "f1": 0.4417724337564017,
+        "support": 1387
+      },
+      "HIGH": {
+        "precision": 0.5275590551181102,
+        "recall": 0.5555555555555556,
+        "f1": 0.5411954765751211,
+        "support": 603
+      }
+    },
+    "confusion_matrix": {
+      "labels": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "matrix": [
+        [
+          13072,
+          1853,
+          84
+        ],
+        [
+          179,
+          992,
+          216
+        ],
+        [
+          9,
+          259,
+          335
+        ]
+      ]
+    },
+    "brier_multiclass": 0.18850304096405268,
+    "roc_auc_ovr_macro": 0.9408574771500179
+  },
+  "reliability_high_class_test": [
+    {
+      "bin": "0.0-0.1",
+      "mean_predicted": 0.010039986730743458,
+      "observed_frequency": 0.000897196261682243,
+      "n": 13375
+    },
+    {
+      "bin": "0.1-0.2",
+      "mean_predicted": 0.14601794073705682,
+      "observed_frequency": 0.03164556962025317,
+      "n": 1422
+    },
+    {
+      "bin": "0.2-0.3",
+      "mean_predicted": 0.24419877885919408,
+      "observed_frequency": 0.07923169267707082,
+      "n": 833
+    },
+    {
+      "bin": "0.3-0.4",
+      "mean_predicted": 0.345598712012306,
+      "observed_frequency": 0.17751479289940827,
+      "n": 507
+    },
+    {
+      "bin": "0.4-0.5",
+      "mean_predicted": 0.44722752072721805,
+      "observed_frequency": 0.2770083102493075,
+      "n": 361
+    },
+    {
+      "bin": "0.5-0.6",
+      "mean_predicted": 0.5452811341765518,
+      "observed_frequency": 0.45,
+      "n": 240
+    },
+    {
+      "bin": "0.6-0.7",
+      "mean_predicted": 0.6479099980047244,
+      "observed_frequency": 0.6013071895424836,
+      "n": 153
+    },
+    {
+      "bin": "0.7-0.8",
+      "mean_predicted": 0.744584754273606,
+      "observed_frequency": 0.8024691358024691,
+      "n": 81
+    },
+    {
+      "bin": "0.8-0.9",
+      "mean_predicted": 0.8392377651743262,
+      "observed_frequency": 0.9230769230769231,
+      "n": 26
+    },
+    {
+      "bin": "0.9-1.0",
+      "mean_predicted": 0.9026132254686996,
+      "observed_frequency": 1.0,
+      "n": 1
+    }
+  ],
+  "permutation_importance_validation": [
+    {
+      "feature": "aircraft_count",
+      "importance_mean": 0.03478182248401389,
+      "importance_std": 0.004096360873588426
+    },
+    {
+      "feature": "neighbor_count",
+      "importance_mean": 0.021887303377938604,
+      "importance_std": 0.0036640128313744687
+    },
+    {
+      "feature": "count_roll4_mean",
+      "importance_mean": 0.018144390543297573,
+      "importance_std": 0.007328670907601591
+    },
+    {
+      "feature": "cell_id",
+      "importance_mean": 0.013443361211779536,
+      "importance_std": 0.002047434829965139
+    },
+    {
+      "feature": "traffic_change",
+      "importance_mean": 0.012341018750498867,
+      "importance_std": 0.0016140155072467215
+    },
+    {
+      "feature": "mean_altitude_m",
+      "importance_mean": 0.005015825127922091,
+      "importance_std": 0.0017993735183290385
+    },
+    {
+      "feature": "mean_speed_mps",
+      "importance_mean": 0.004512223046895203,
+      "importance_std": 0.0016765532473272306
+    },
+    {
+      "feature": "wind_gusts_10m_ms",
+      "importance_mean": 0.0040264897141655265,
+      "importance_std": 0.002981947586169169
+    },
+    {
+      "feature": "count_lag1",
+      "importance_mean": 0.0038162816750764604,
+      "importance_std": 0.0024783876514630214
+    },
+    {
+      "feature": "wind_dir_sin",
+      "importance_mean": 0.003051020906904989,
+      "importance_std": 0.0011699173565367894
+    },
+    {
+      "feature": "cloud_cover_pct",
+      "importance_mean": 0.0022158820561173354,
+      "importance_std": 0.0018468067391786468
+    },
+    {
+      "feature": "speed_std_mps",
+      "importance_mean": 0.001857709547472708,
+      "importance_std": 0.0011163388843837005
+    },
+    {
+      "feature": "wind_dir_cos",
+      "importance_mean": 0.0010576017861646746,
+      "importance_std": 0.002065304239144578
+    },
+    {
+      "feature": "count_lag4",
+      "importance_mean": 0.000937645798637643,
+      "importance_std": 0.0016653751079730521
+    },
+    {
+      "feature": "hour_cos",
+      "importance_mean": 0.00023877707277650818,
+      "importance_std": 0.001204576206722817
+    },
+    {
+      "feature": "precipitation_mm",
+      "importance_mean": 0.0,
+      "importance_std": 0.0
+    },
+    {
+      "feature": "weather_missing",
+      "importance_mean": 0.0,
+      "importance_std": 0.0
+    },
+    {
+      "feature": "wind_speed_10m_ms",
+      "importance_mean": -4.7554093782298244e-05,
+      "importance_std": 0.0030226303108309197
+    },
+    {
+      "feature": "count_lag2",
+      "importance_mean": -0.0017204508018093146,
+      "importance_std": 0.0015227038358353007
+    },
+    {
+      "feature": "neighbor_count_lag1",
+      "importance_mean": -0.0029126921605483027,
+      "importance_std": 0.0021106085106688895
+    },
+    {
+      "feature": "hour_sin",
+      "importance_mean": -0.003464523878256065,
+      "importance_std": 0.0014801916438551457
+    }
+  ],
+  "builtin_importance": [
+    {
+      "feature": "aircraft_count",
+      "importance": 0.1391407847588995
+    },
+    {
+      "feature": "count_roll4_mean",
+      "importance": 0.11674920485328075
+    },
+    {
+      "feature": "neighbor_count",
+      "importance": 0.08316556252357639
+    },
+    {
+      "feature": "speed_std_mps",
+      "importance": 0.06192862795687439
+    },
+    {
+      "feature": "count_lag4",
+      "importance": 0.0591697909713283
+    },
+    {
+      "feature": "cell_id",
+      "importance": 0.05793082419239548
+    },
+    {
+      "feature": "count_lag1",
+      "importance": 0.05783264424509875
+    },
+    {
+      "feature": "count_lag2",
+      "importance": 0.055188849158729195
+    },
+    {
+      "feature": "neighbor_count_lag1",
+      "importance": 0.05492488339477555
+    },
+    {
+      "feature": "traffic_change",
+      "importance": 0.05106457258406296
+    },
+    {
+      "feature": "mean_altitude_m",
+      "importance": 0.047599303797482055
+    },
+    {
+      "feature": "mean_speed_mps",
+      "importance": 0.03957079995174977
+    },
+    {
+      "feature": "wind_gusts_10m_ms",
+      "importance": 0.027839556728068787
+    },
+    {
+      "feature": "wind_speed_10m_ms",
+      "importance": 0.026386456342564497
+    },
+    {
+      "feature": "wind_dir_cos",
+      "importance": 0.025856703398328424
+    },
+    {
+      "feature": "cloud_cover_pct",
+      "importance": 0.024111863978734684
+    },
+    {
+      "feature": "wind_dir_sin",
+      "importance": 0.023373291282754928
+    },
+    {
+      "feature": "hour_cos",
+      "importance": 0.022656243399082062
+    },
+    {
+      "feature": "hour_sin",
+      "importance": 0.021294732269746656
+    },
+    {
+      "feature": "precipitation_mm",
+      "importance": 0.004215304212466868
+    },
+    {
+      "feature": "weather_missing",
+      "importance": 0.0
+    }
+  ],
+  "training_ranges": {
+    "hour_sin": [
+      -1.0,
+      1.0
+    ],
+    "hour_cos": [
+      -1.0,
+      0.9978589232386035
+    ],
+    "aircraft_count": [
+      0.0,
+      6.0
+    ],
+    "count_lag1": [
+      0.0,
+      6.0
+    ],
+    "count_lag2": [
+      0.0,
+      6.0
+    ],
+    "count_lag4": [
+      0.0,
+      6.0
+    ],
+    "count_roll4_mean": [
+      0.0,
+      5.5
+    ],
+    "traffic_change": [
+      -3.0,
+      3.0
+    ],
+    "neighbor_count": [
+      0.0,
+      25.0
+    ],
+    "neighbor_count_lag1": [
+      0.0,
+      25.0
+    ],
+    "mean_speed_mps": [
+      104.51227999999999,
+      255.33274999999998
+    ],
+    "speed_std_mps": [
+      0.448307662080562,
+      58.36092655665247
+    ],
+    "mean_altitude_m": [
+      193.5555,
+      11853.5
+    ],
+    "wind_speed_10m_ms": [
+      1.6,
+      9.41
+    ],
+    "wind_dir_sin": [
+      -0.9999025240093042,
+      -0.7132504491541813
+    ],
+    "wind_dir_cos": [
+      -0.6984152854310062,
+      0.6946583704589973
+    ],
+    "precipitation_mm": [
+      0.0,
+      1.87
+    ],
+    "cloud_cover_pct": [
+      0.0,
+      46.5
+    ],
+    "wind_gusts_10m_ms": [
+      2.61,
+      14.48
+    ],
+    "weather_missing": [
+      0.0,
+      0.0
+    ]
+  },
+  "reference_values": {
+    "hour_sin": 1.2246467991473532e-16,
+    "hour_cos": -1.8369701987210297e-16,
+    "aircraft_count": 0.0,
+    "count_lag1": 0.0,
+    "count_lag2": 0.0,
+    "count_lag4": 0.0,
+    "count_roll4_mean": 0.0,
+    "traffic_change": 0.0,
+    "neighbor_count": 4.0,
+    "neighbor_count_lag1": 4.0,
+    "mean_speed_mps": 206.02761111111113,
+    "speed_std_mps": 13.209780467517243,
+    "mean_altitude_m": 9447.526785714286,
+    "wind_speed_10m_ms": 5.47,
+    "wind_dir_sin": -0.908508177526722,
+    "wind_dir_cos": -0.08541692313736678,
+    "precipitation_mm": 0.0,
+    "cloud_cover_pct": 20.2,
+    "wind_gusts_10m_ms": 8.4,
+    "weather_missing": 0.0
+  },
+  "random_seed": 20260115,
+  "data_kind": "synthetic",
+  "dataset_id": "synthetic_demo_v1",
+  "data_notice": "Trained on SYNTHETIC demonstration data. Metrics are software-demonstration figures, NOT evidence of real-world aviation accuracy.",
+  "trained_at_utc": "2026-10-13T10:06:48.372969+00:00",
+  "source_manifest": "data/source_manifest.json",
+  "kind": "congestion",
+  "version": "v20261013T100721Z",
+  "sha256": "5cbcfe8f5dad1338b51a9cceda526c5a151b4755a875d05c1561ae6f91dfa4ad",
+  "library_versions": {
+    "python": "3.11.9",
+    "scikit-learn": "1.9.1",
+    "pandas": "3.0.6",
+    "numpy": "2.4.6",
+    "joblib": "1.6.0",
+    "networkx": "3.6.1"
+  }
+}
