@@ -1,187 +1,181 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  ShieldCheck, 
-  Database, 
-  CheckCircle, 
-  AlertTriangle, 
-  Layers, 
-  FileText, 
-  ExternalLink 
+import React, { useEffect, useState } from 'react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Database,
+  FileText,
+  RefreshCw,
+  ShieldCheck,
+  TriangleAlert,
 } from 'lucide-react';
 import { api } from '../services/api';
+import { asRecord, findMetric, formatNumber } from '../services/metricUtils';
+
+type JsonRecord = Record<string, unknown>;
+
+const readText = (record: JsonRecord, keys: string[]): string | null => {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  }
+  return null;
+};
+
+const displayStatus = (value: string | null): string => {
+  if (!value) return 'Not reported';
+  return value.replace(/[_-]+/g, ' ');
+};
+
+const statusTone = (status: string | null): string => {
+  const normalized = (status || '').toLowerCase();
+  if (['ok', 'online', 'healthy', 'connected', 'cached', 'cached_verified', 'operational', 'available'].some((key) => normalized.includes(key))) return 'status-good';
+  if (['error', 'unavailable', 'failed', 'disconnected'].some((key) => normalized.includes(key))) return 'status-bad';
+  return 'status-muted';
+};
+
+const qaStages = [
+  { number: '01', title: 'Schema and required fields', description: 'Check required fields and confirm values can be interpreted by the pipeline.' },
+  { number: '02', title: 'Coordinate bounds', description: 'Reject or flag invalid latitude/longitude values before geospatial processing.' },
+  { number: '03', title: 'Kinematic plausibility', description: 'Check speed, heading, altitude, and climb/descent values against configured limits.' },
+  { number: '04', title: 'Duplicate observations', description: 'Identify repeated aircraft observations for the same timestamp.' },
+  { number: '05', title: 'Missing-value handling', description: 'Retain missingness and provenance rather than silently inventing measurements.' },
+  { number: '06', title: 'Anomaly isolation', description: 'Flag suspicious or inconsistent transponder and observation patterns.' },
+  { number: '07', title: 'Track segmentation', description: 'Split observations into tracks when configured time gaps or continuity rules are crossed.' },
+  { number: '08', title: 'Spatial and temporal aggregation', description: 'Assign observations to the documented 2° grid and 15-minute analysis windows.' },
+  { number: '09', title: 'Leakage-safe data splits', description: 'Keep training, validation, and test periods chronological for evaluation.' },
+];
 
 export const DataQualityView: React.FC = () => {
-  const [sources, setSources] = useState<any[]>([]);
-  const [qualitySummary, setQualitySummary] = useState<any>(null);
+  const [sources, setSources] = useState<JsonRecord[]>([]);
+  const [qualitySummary, setQualitySummary] = useState<JsonRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshedAt, setRefreshedAt] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [srcs, ql] = await Promise.all([
-          api.getDataSourcesStatus().catch(() => []),
-          api.getDataQualitySummary().catch(() => null),
-        ]);
-        setSources(srcs);
-        setQualitySummary(ql);
-      } catch (e) {
-        console.error(e);
-      }
-    };
-    fetchData();
-  }, []);
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    const [sourceResult, qualityResult] = await Promise.allSettled([
+      api.getDataSourcesStatus(),
+      api.getDataQualitySummary(),
+    ]);
 
-  const defaultSources = [
-    {
-      source_name: 'OurAirports Data',
-      kind: 'airports',
-      status: 'cached_verified',
-      is_synthetic: false,
-      provenance: 'data/reference/airports_subset.csv (SHA-256 verified)',
-      details: '19 primary Indian international and domestic airports with exact ICAO/IATA identifiers.',
-    },
-    {
-      source_name: 'OpenSky Network API',
-      kind: 'surveillance',
-      status: 'integrated_fallback',
-      is_synthetic: true,
-      provenance: 'REST /states/all bounded bbox with synthetic seed generator fallback',
-      details: 'Surveillance observations sampled at 90s intervals with complete physics models.',
-    },
-    {
-      source_name: 'Open-Meteo Historical Archive',
-      kind: 'weather',
-      status: 'integrated_cached',
-      is_synthetic: true,
-      provenance: 'Hourly corridor grid cells (archive-api.open-meteo.com)',
-      details: 'Hourly surface wind, gusts, precipitation, and cloud cover fields.',
-    },
-    {
-      source_name: 'Synthetic Airspace Generator',
-      kind: 'ground_truth',
-      status: 'active_seeded',
-      is_synthetic: true,
-      provenance: 'Reproducible Seed 20260115 (3,678 flights, 276,000 observations)',
-      details: 'Full deterministic ground truth with synthetic fault injection for QA verification.',
-    },
-  ];
+    const errors: string[] = [];
+    if (sourceResult.status === 'fulfilled' && Array.isArray(sourceResult.value)) {
+      setSources(sourceResult.value.map(asRecord).filter((item): item is JsonRecord => item !== null));
+    } else {
+      setSources([]);
+      errors.push(sourceResult.status === 'rejected'
+        ? `Source manifest: ${sourceResult.reason instanceof Error ? sourceResult.reason.message : 'request failed'}`
+        : 'Source manifest returned an unexpected payload.');
+    }
 
-  const displaySources = sources.length > 0 ? sources : defaultSources;
+    if (qualityResult.status === 'fulfilled') {
+      setQualitySummary(asRecord(qualityResult.value));
+    } else {
+      setQualitySummary(null);
+      errors.push(qualityResult.reason instanceof Error ? qualityResult.reason.message : 'Quality summary request failed.');
+    }
+
+    setError(errors.length ? errors.join(' ') : null);
+    setRefreshedAt(new Date().toLocaleTimeString());
+    setLoading(false);
+  };
+
+  useEffect(() => { void loadData(); }, []);
+
+  const examined = findMetric(qualitySummary, ['records_examined', 'total_records', 'observations_processed', 'input_records', 'row_count']);
+  const rejected = findMetric(qualitySummary, ['records_rejected', 'rejected_records', 'invalid_records', 'dropped_records']);
+  const flagged = findMetric(qualitySummary, ['records_flagged', 'flagged_records', 'warnings_count']);
+  const checkCount = findMetric(qualitySummary, ['checks_passed', 'stages_passed', 'validations_passed']);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-5 shadow-lg">
-        <h2 className="text-lg font-bold text-white flex items-center gap-2 font-mono">
-          <ShieldCheck className="w-5 h-5 text-emerald-400" />
-          DATA INGESTION, SOURCES & AUDITABLE QUALITY PIPELINE
-        </h2>
-        <p className="text-xs text-slate-400 mt-0.5">
-          Explicit provenance tracking, fallback architectures, and 9-stage auditable QA validation
-        </p>
-      </div>
-
-      {/* Data Sources Manifest Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {displaySources.map((src, idx) => (
-          <div key={idx} className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-5 space-y-3 shadow-lg">
-            <div className="flex items-center justify-between">
-              <span className="font-bold font-mono text-sm text-white">{src.source_name}</span>
-              <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 text-[10px] font-mono font-bold uppercase">
-                {src.status || 'OPERATIONAL'}
-              </span>
-            </div>
-
-            <p className="text-xs text-slate-300 leading-relaxed">
-              {src.details || 'Real-time or synthetic research data source.'}
-            </p>
-
-            <div className="p-2.5 rounded-lg bg-aerospace-950 border border-aerospace-800 text-[11px] font-mono text-slate-400">
-              <span className="text-slate-500">PROVENANCE: </span>
-              <span className="text-cyan-300">{src.provenance}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* 9-Stage QA Pipeline Table */}
-      <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-5 shadow-lg space-y-3">
-        <h3 className="text-sm font-bold text-white font-mono flex items-center gap-2">
-          <CheckCircle className="w-4 h-4 text-cyan-400" />
-          9-STAGE AUDITABLE DATA QUALITY (QA) PIPELINE
-        </h3>
-        <p className="text-xs text-slate-400">
-          Every raw telemetry record undergoes strict deterministic validation before model feature extraction
-        </p>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs font-mono">
-            <thead className="bg-aerospace-950 text-slate-400 border-b border-aerospace-800">
-              <tr>
-                <th className="py-2.5 px-3">Stage</th>
-                <th className="py-2.5 px-3">Validation Rule</th>
-                <th className="py-2.5 px-3">Action on Failure</th>
-                <th className="py-2.5 px-3">Purpose</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-aerospace-800 text-slate-300">
-              <tr className="hover:bg-aerospace-850/50">
-                <td className="py-2 px-3 font-bold text-cyan-300">Stage 1</td>
-                <td className="py-2 px-3">Latitude ∈ [6, 34], Longitude ∈ [66, 94]</td>
-                <td className="py-2 px-3 text-rose-400">Flagged & Dropped</td>
-                <td className="py-2 px-3 text-slate-400">Geospatial corridor bounding box check</td>
-              </tr>
-              <tr className="hover:bg-aerospace-850/50">
-                <td className="py-2 px-3 font-bold text-cyan-300">Stage 2</td>
-                <td className="py-2 px-3">Altitude &gt; 0 and &lt; 15,000 meters</td>
-                <td className="py-2 px-3 text-amber-400">Flagged Missing (No zero-fill)</td>
-                <td className="py-2 px-3 text-slate-400">Aviation altitude plausibility</td>
-              </tr>
-              <tr className="hover:bg-aerospace-850/50">
-                <td className="py-2 px-3 font-bold text-cyan-300">Stage 3</td>
-                <td className="py-2 px-3">Ground Speed ≤ 320 m/s (~1,150 km/h)</td>
-                <td className="py-2 px-3 text-rose-400">Clamped / Flagged</td>
-                <td className="py-2 px-3 text-slate-400">Subsonic airliner kinematic limits</td>
-              </tr>
-              <tr className="hover:bg-aerospace-850/50">
-                <td className="py-2 px-3 font-bold text-cyan-300">Stage 4</td>
-                <td className="py-2 px-3">Deduplication on [aircraft_id, timestamp_utc]</td>
-                <td className="py-2 px-3 text-rose-400">Deduplicated</td>
-                <td className="py-2 px-3 text-slate-400">Multi-receiver surveillance duplicate elimination</td>
-              </tr>
-              <tr className="hover:bg-aerospace-850/50">
-                <td className="py-2 px-3 font-bold text-cyan-300">Stage 5</td>
-                <td className="py-2 px-3">Heading degrees modulo wrap [0, 360)</td>
-                <td className="py-2 px-3 text-emerald-400">Normalized</td>
-                <td className="py-2 px-3 text-slate-400">Navigational coordinate alignment</td>
-              </tr>
-              <tr className="hover:bg-aerospace-850/50">
-                <td className="py-2 px-3 font-bold text-cyan-300">Stage 6</td>
-                <td className="py-2 px-3">Missing value provenance attribution</td>
-                <td className="py-2 px-3 text-purple-400">Raised Uncertainty Flag</td>
-                <td className="py-2 px-3 text-slate-400">Never fabricate observations as real data</td>
-              </tr>
-              <tr className="hover:bg-aerospace-850/50">
-                <td className="py-2 px-3 font-bold text-cyan-300">Stage 7</td>
-                <td className="py-2 px-3">Track segmentation on gaps &gt; 30 minutes</td>
-                <td className="py-2 px-3 text-cyan-300">New Track ID Inferred</td>
-                <td className="py-2 px-3 text-slate-400">Flight mission segmentation</td>
-              </tr>
-              <tr className="hover:bg-aerospace-850/50">
-                <td className="py-2 px-3 font-bold text-cyan-300">Stage 8</td>
-                <td className="py-2 px-3">Half-open 2.0° grid cell spatial binning</td>
-                <td className="py-2 px-3 text-emerald-400">Cell Assigned</td>
-                <td className="py-2 px-3 text-slate-400">Uniform density aggregation</td>
-              </tr>
-              <tr className="hover:bg-aerospace-850/50">
-                <td className="py-2 px-3 font-bold text-cyan-300">Stage 9</td>
-                <td className="py-2 px-3">Strict chronological train/val/test splits</td>
-                <td className="py-2 px-3 text-emerald-400">Boundary Purged</td>
-                <td className="py-2 px-3 text-slate-400">Zero data leakage across time boundaries</td>
-              </tr>
-            </tbody>
-          </table>
+    <div className="space-y-5 page-data-quality">
+      <section className="view-hero view-hero-green">
+        <div className="view-hero-copy">
+          <p className="eyebrow">DATA GOVERNANCE · PROVENANCE · VALIDATION</p>
+          <h2>Data &amp; quality assurance</h2>
+          <p>Inspect the source manifest, distinguish synthetic from observed data, and review the validation stages that protect downstream feature engineering and model evaluation.</p>
         </div>
-      </div>
+        <div className="view-hero-actions">
+          <button type="button" className="action-secondary" onClick={() => void loadData()} disabled={loading}>
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> {loading ? 'Refreshing…' : 'Refresh status'}
+          </button>
+        </div>
+      </section>
+
+      {error && (
+        <div className="view-inline-error" role="alert">
+          <AlertCircle size={16} />
+          <div><strong>Some QA information could not be loaded</strong><p>{error}</p></div>
+        </div>
+      )}
+
+      <section className="stats-grid qa-summary-grid" aria-label="Data quality summary">
+        <article className="stat-card accent-cyan"><div className="stat-card-top"><span>Sources reported</span><Database size={17} /></div><div className="stat-card-value">{loading && sources.length === 0 ? '…' : sources.length}</div><div className="stat-card-subtitle">Returned by the source-status API</div></article>
+        <article className="stat-card accent-blue"><div className="stat-card-top"><span>Records examined</span><FileText size={17} /></div><div className="stat-card-value">{formatNumber(examined, 0)}</div><div className="stat-card-subtitle">Only shown when reported by the backend</div></article>
+        <article className="stat-card accent-amber"><div className="stat-card-top"><span>Rejected / invalid</span><TriangleAlert size={17} /></div><div className="stat-card-value">{formatNumber(rejected, 0)}</div><div className="stat-card-subtitle">No value is inferred when absent</div></article>
+        <article className="stat-card accent-green"><div className="stat-card-top"><span>Checks passed</span><CheckCircle2 size={17} /></div><div className="stat-card-value">{checkCount === null ? '—' : formatNumber(checkCount, 0)}</div><div className="stat-card-subtitle">From the available QA summary</div></article>
+      </section>
+
+      <section className="surface-card qa-source-section">
+        <div className="surface-card-heading">
+          <div><p className="eyebrow">DATA SOURCE MANIFEST</p><h3>Where the data comes from</h3><p className="surface-subtitle">Each card reflects the API response. A missing source is shown as missing—not replaced with a fabricated healthy status.</p></div>
+          <span className="status-tag tag-muted">{refreshedAt ? `Checked ${refreshedAt}` : 'Not checked yet'}</span>
+        </div>
+
+        {loading && sources.length === 0 ? (
+          <div className="empty-state"><RefreshCw size={22} className="animate-spin"/><h3>Loading source manifest</h3><p>Waiting for the backend to return current source status.</p></div>
+        ) : sources.length === 0 ? (
+          <div className="empty-state"><Database size={22}/><h3>No source status returned</h3><p>Check that the FastAPI backend is running and that GET /api/data-sources/status is available.</p></div>
+        ) : (
+          <div className="qa-source-grid">
+            {sources.map((source, index) => {
+              const name = readText(source, ['source_name', 'name', 'source_key', 'source', 'kind']) || `Source ${index + 1}`;
+              const status = readText(source, ['status', 'state', 'availability']);
+              const provenance = readText(source, ['provenance', 'source_path', 'dataset', 'dataset_id', 'uri']);
+              const details = readText(source, ['details', 'message', 'description', 'note']);
+              const synthetic = source.is_synthetic === true || readText(source, ['data_kind'])?.toLowerCase() === 'synthetic';
+              return (
+                <article className="qa-source-card" key={`${name}-${index}`}>
+                  <div className="qa-source-card-top">
+                    <div className="qa-source-icon"><Database size={17}/></div>
+                    <span className={`status-tag ${statusTone(status)}`}>{displayStatus(status)}</span>
+                  </div>
+                  <h4>{name}</h4>
+                  <p>{details || 'The backend did not provide a source description.'}</p>
+                  <div className="qa-source-meta"><span>DATA KIND</span><strong>{synthetic ? 'Synthetic' : readText(source, ['data_kind', 'kind']) || 'Not reported'}</strong></div>
+                  <div className="qa-source-provenance"><span>PROVENANCE</span><code>{provenance || 'Not reported by API'}</code></div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="surface-card qa-pipeline-section">
+        <div className="surface-card-heading">
+          <div><p className="eyebrow">PREPROCESSING PIPELINE</p><h3>Nine validation stages</h3><p className="surface-subtitle">These describe the intended checks in the data pipeline; completion status is only displayed when the backend reports it.</p></div>
+          <ShieldCheck size={21} className="text-emerald-300" />
+        </div>
+        <div className="qa-stage-grid">
+          {qaStages.map((stage) => (
+            <article className="qa-stage-card" key={stage.number}>
+              <span className="qa-stage-number">{stage.number}</span>
+              <div><h4>{stage.title}</h4><p>{stage.description}</p></div>
+              <span className="qa-stage-badge">Pipeline step</span>
+            </article>
+          ))}
+        </div>
+        {qualitySummary && (
+          <details className="raw-report-details">
+            <summary><FileText size={15}/> Inspect raw quality summary</summary>
+            <pre>{JSON.stringify(qualitySummary, null, 2)}</pre>
+          </details>
+        )}
+        {flagged !== null && <p className="qa-footnote">Backend-reported flagged records: <strong>{formatNumber(flagged, 0)}</strong>. Review the raw summary for its exact definition.</p>}
+      </section>
     </div>
   );
 };

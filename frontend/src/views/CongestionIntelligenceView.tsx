@@ -3,15 +3,14 @@ import {
   BarChart3, 
   Cpu, 
   Layers, 
-  CheckCircle2, 
-  AlertTriangle, 
   TrendingUp, 
-  Sliders, 
-  Activity 
+  Activity,
+  AlertCircle,
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import type { ModelsStatusResponse, CongestionCell } from '../types';
 import { api } from '../services/api';
+import { findMetric, formatNumber, formatPercent } from '../services/metricUtils';
 
 interface CongestionIntelligenceViewProps {
   modelsStatus: ModelsStatusResponse | null;
@@ -22,19 +21,37 @@ export const CongestionIntelligenceView: React.FC<CongestionIntelligenceViewProp
   const [featureImportance, setFeatureImportance] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedCell, setSelectedCell] = useState<string | null>(null);
+  const [dataError, setDataError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
-        const [cellData, fiData] = await Promise.all([
-          api.getCongestionCells().catch(() => []),
-          api.getFeatureImportance().catch(() => ({ congestion: [] })),
+        const [cellResult, importanceResult] = await Promise.allSettled([
+          api.getCongestionCells(),
+          api.getFeatureImportance(),
         ]);
-        setCells(cellData);
-        setFeatureImportance(fiData.congestion || []);
+        if (cellResult.status === 'fulfilled' && Array.isArray(cellResult.value)) {
+          setCells(cellResult.value);
+        } else {
+          setCells([]);
+          setDataError('Congestion cell data could not be loaded from the backend.');
+        }
+        if (importanceResult.status === 'fulfilled') {
+          const payload = importanceResult.value as { congestion?: unknown[] } | unknown[];
+          const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.congestion) ? payload.congestion : [];
+          setFeatureImportance(rows.map((item) => {
+            const row = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+            const feature = row.feature ?? row.feature_name ?? row.name ?? row.key;
+            const importance = row.importance ?? row.value ?? row.score;
+            return { feature: String(feature ?? 'Unknown feature'), importance: Number(importance) };
+          }).filter((row) => row.feature !== 'Unknown feature' && Number.isFinite(row.importance))); 
+        } else {
+          setFeatureImportance([]);
+          setDataError((current) => current || 'Feature-importance report could not be loaded.');
+        }
       } catch (e) {
-        console.error(e);
+        setDataError(e instanceof Error ? e.message : 'Congestion data could not be loaded.');
       } finally {
         setLoading(false);
       }
@@ -43,11 +60,16 @@ export const CongestionIntelligenceView: React.FC<CongestionIntelligenceViewProp
   }, []);
 
   const congModel = modelsStatus?.congestion_model;
+  const modelMetrics = congModel?.metrics || {};
+  const accuracy = findMetric(modelMetrics, ['test_accuracy', 'accuracy', 'accuracy_score']);
+  const balancedAccuracy = findMetric(modelMetrics, ['balanced_accuracy', 'balanced_acc']);
+  const macroF1 = findMetric(modelMetrics, ['macro_f1', 'f1_macro', 'macro_f1_score']);
+  const metricSampleCount = findMetric(modelMetrics, ['test_samples', 'n_test_samples', 'test_size', 'test_records']);
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-5 shadow-lg">
+      <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-5 shadow-lg view-hero view-hero-green">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold text-white flex items-center gap-2 font-mono">
@@ -60,7 +82,7 @@ export const CongestionIntelligenceView: React.FC<CongestionIntelligenceViewProp
           </div>
           <div className="flex items-center gap-2 text-xs font-mono">
             <span className="px-2.5 py-1 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold">
-              CLASSIFIER: RANDOM FOREST
+              {congModel?.name ? `CLASSIFIER: ${congModel.name.toUpperCase()}` : 'CLASSIFIER: MODEL NOT REPORTED'}
             </span>
             <span className="px-2.5 py-1 rounded bg-aerospace-800 text-slate-300 border border-aerospace-700">
               WINDOW: 15 MIN
@@ -69,6 +91,8 @@ export const CongestionIntelligenceView: React.FC<CongestionIntelligenceViewProp
         </div>
       </div>
 
+      {dataError && <div className="view-inline-error" role="alert"><AlertCircle size={16} /><div><strong>Some congestion data is unavailable</strong><p>{dataError}</p></div></div>}
+      {loading && <div className="loading-strip"><span className="loading-spinner" /> Loading congestion and feature-importance data…</div>}
       {/* Model Architecture Card & Metrics */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Model Card */}
@@ -81,15 +105,15 @@ export const CongestionIntelligenceView: React.FC<CongestionIntelligenceViewProp
           <div className="space-y-2 text-xs font-mono">
             <div className="flex justify-between py-1.5 border-b border-aerospace-800">
               <span className="text-slate-400">Model Name:</span>
-              <span className="text-white font-bold">{congModel?.name || 'Random Forest'}</span>
+              <span className="text-white font-bold">{congModel?.name || 'Not reported by API'}</span>
             </div>
             <div className="flex justify-between py-1.5 border-b border-aerospace-800">
               <span className="text-slate-400">Version:</span>
-              <span className="text-cyan-300">{congModel?.version || 'v20261013T100721Z'}</span>
+              <span className="text-cyan-300">{congModel?.version || '—'}</span>
             </div>
             <div className="flex justify-between py-1.5 border-b border-aerospace-800">
               <span className="text-slate-400">Feature Dimensions:</span>
-              <span className="text-slate-200">{congModel?.feature_count || 21} features</span>
+              <span className="text-slate-200">{congModel?.feature_count != null ? `${congModel.feature_count} features` : '—'}</span>
             </div>
             <div className="flex justify-between py-1.5 border-b border-aerospace-800">
               <span className="text-slate-400">Target Variable:</span>
@@ -97,11 +121,11 @@ export const CongestionIntelligenceView: React.FC<CongestionIntelligenceViewProp
             </div>
             <div className="flex justify-between py-1.5 border-b border-aerospace-800">
               <span className="text-slate-400">Quantile Thresholds:</span>
-              <span className="text-slate-200">LOW ≤ 2, MED ≤ 4, HIGH &gt; 4</span>
+              <span className="text-slate-200">LOW / MEDIUM / HIGH</span>
             </div>
             <div className="flex justify-between py-1.5">
               <span className="text-slate-400">Artifact Checksum:</span>
-              <span className="text-purple-300 truncate max-w-[150px]">{congModel?.sha256 || 'Verified'}</span>
+              <span className="text-purple-300 truncate max-w-[150px]">{congModel?.sha256 ? `${congModel.sha256.slice(0, 12)}…` : 'Not reported'}</span>
             </div>
           </div>
 
@@ -121,32 +145,31 @@ export const CongestionIntelligenceView: React.FC<CongestionIntelligenceViewProp
           <div className="grid grid-cols-2 gap-3 text-xs font-mono">
             <div className="p-3 rounded-lg bg-aerospace-950 border border-aerospace-800">
               <div className="text-slate-400 text-[10px]">RAW ACCURACY</div>
-              <div className="text-xl font-bold text-emerald-400 mt-1">84.7%</div>
-              <div className="text-[10px] text-slate-400 mt-1">16,999 test slices</div>
+              <div className="text-xl font-bold text-emerald-400 mt-1">{formatPercent(accuracy)}</div>
+              <div className="text-[10px] text-slate-400 mt-1">{metricSampleCount == null ? 'Sample count not reported' : `${formatNumber(metricSampleCount, 0)} test examples`}</div>
             </div>
 
             <div className="p-3 rounded-lg bg-aerospace-950 border border-aerospace-800">
               <div className="text-slate-400 text-[10px]">BALANCED ACCURACY</div>
-              <div className="text-xl font-bold text-cyan-300 mt-1">71.4%</div>
-              <div className="text-[10px] text-slate-400 mt-1">Class-unweighted</div>
+              <div className="text-xl font-bold text-cyan-300 mt-1">{formatPercent(balancedAccuracy)}</div>
+              <div className="text-[10px] text-slate-400 mt-1">Class-balanced score</div>
             </div>
 
             <div className="p-3 rounded-lg bg-aerospace-950 border border-aerospace-800">
               <div className="text-slate-400 text-[10px]">MACRO F1 SCORE</div>
-              <div className="text-xl font-bold text-amber-400 mt-1">0.636</div>
-              <div className="text-[10px] text-slate-400 mt-1">Vs Dummy (0.312)</div>
+              <div className="text-xl font-bold text-amber-400 mt-1">{formatNumber(macroF1, 4)}</div>
+              <div className="text-[10px] text-slate-400 mt-1">From returned model report</div>
             </div>
 
             <div className="p-3 rounded-lg bg-aerospace-950 border border-aerospace-800">
               <div className="text-slate-400 text-[10px]">OOD DETECTION</div>
-              <div className="text-xl font-bold text-purple-300 mt-1">ACTIVE</div>
-              <div className="text-[10px] text-slate-400 mt-1">Min/Max Envelope</div>
+              <div className="text-xl font-bold text-purple-300 mt-1">Not reported</div>
+              <div className="text-[10px] text-slate-400 mt-1">No OOD status field exposed here</div>
             </div>
           </div>
 
           <div className="p-3 rounded-lg bg-aerospace-950 border border-aerospace-800 text-[11px] text-slate-300 leading-relaxed font-sans">
-            <strong>Baseline Comparison:</strong> Outperforms Zero-R baseline (Dummy Most Frequent, Macro-F1 0.312) 
-            and Logistic Regression (Macro-F1 0.583) with high margin on the chronological test partition.
+            <strong>Evaluation note:</strong> Metrics are shown only when they are returned by the model status payload. Open Model Evaluation to inspect the saved report and compare candidates.
           </div>
         </div>
 
@@ -157,7 +180,7 @@ export const CongestionIntelligenceView: React.FC<CongestionIntelligenceViewProp
             <span>TOP FEATURE IMPORTANCES</span>
           </div>
 
-          <div className="h-52 w-full">
+          {featureImportance.length > 0 ? <div className="h-52 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={featureImportance.slice(0, 6)}
@@ -182,10 +205,8 @@ export const CongestionIntelligenceView: React.FC<CongestionIntelligenceViewProp
                 <Bar dataKey="importance" fill="#10b981" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
-          <p className="text-[10px] text-slate-400 font-mono">
-            Derived Gini feature importance from the ensemble trees.
-          </p>
+          </div> : <div className="empty-state feature-importance-empty"><TrendingUp size={21}/><h3>No feature-importance report</h3><p>The API did not return importance values. Check the model report or endpoint before presenting feature rankings.</p></div>}
+          <p className="text-[10px] text-slate-400 font-mono">Importance scores are displayed as returned by the backend.</p>
         </div>
       </div>
 
@@ -214,7 +235,9 @@ export const CongestionIntelligenceView: React.FC<CongestionIntelligenceViewProp
               </tr>
             </thead>
             <tbody className="divide-y divide-aerospace-800 text-slate-300">
-              {cells.map((c) => {
+              {cells.length === 0 ? (
+                <tr><td colSpan={6} className="py-8 text-center text-slate-500">No congestion-cell data returned. Check the backend response.</td></tr>
+              ) : cells.map((c) => {
                 const badgeColor =
                   c.predicted_class === 'HIGH'
                     ? 'bg-rose-950 text-rose-300 border-rose-800'
@@ -222,10 +245,10 @@ export const CongestionIntelligenceView: React.FC<CongestionIntelligenceViewProp
                     ? 'bg-amber-950 text-amber-300 border-amber-800'
                     : 'bg-emerald-950 text-emerald-300 border-emerald-800';
                 return (
-                  <tr key={c.cell_id} className="hover:bg-aerospace-850/50 transition">
+                  <tr key={c.cell_id} onClick={() => setSelectedCell(c.cell_id)} className={`cursor-pointer hover:bg-aerospace-850/50 transition ${selectedCell === c.cell_id ? 'bg-cyan-950/25' : ''}`}>
                     <td className="py-2 px-3 font-bold text-white">{c.cell_id}</td>
                     <td className="py-2 px-3 text-slate-400">
-                      {c.center_lat.toFixed(1)}°N, {c.center_lon.toFixed(1)}°E
+                      {Number.isFinite(c.center_lat) ? c.center_lat.toFixed(1) : '—'}°, {Number.isFinite(c.center_lon) ? c.center_lon.toFixed(1) : '—'}°
                     </td>
                     <td className="py-2 px-3">{c.aircraft_count}</td>
                     <td className="py-2 px-3">
@@ -233,9 +256,9 @@ export const CongestionIntelligenceView: React.FC<CongestionIntelligenceViewProp
                         {c.predicted_class}
                       </span>
                     </td>
-                    <td className="py-2 px-3 font-mono">{c.congestion_score.toFixed(2)}</td>
+                    <td className="py-2 px-3 font-mono">{Number.isFinite(c.congestion_score) ? c.congestion_score.toFixed(2) : '—'}</td>
                     <td className="py-2 px-3 text-slate-400">
-                      {c.confidence ? `${(c.confidence * 100).toFixed(0)}%` : 'N/A'}
+                      {c.confidence !== undefined && Number.isFinite(c.confidence) ? `${(c.confidence * 100).toFixed(0)}%` : 'N/A'}
                     </td>
                   </tr>
                 );

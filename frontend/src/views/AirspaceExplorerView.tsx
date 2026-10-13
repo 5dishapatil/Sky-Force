@@ -59,6 +59,7 @@ export const AirspaceExplorerView: React.FC<AirspaceExplorerViewProps> = ({
         <div className="lg:col-span-3">
           <AirspaceMap
             airports={airports}
+            waypoints={network?.waypoints || []}
             edges={network?.edges || []}
             congestionCells={congestionCells}
             aircraft={aircraft}

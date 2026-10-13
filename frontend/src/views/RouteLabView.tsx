@@ -296,6 +296,7 @@ export const RouteLabView: React.FC<RouteLabViewProps> = ({ network, airports })
       {/* Main Map Visualization */}
       <AirspaceMap
         airports={airports}
+        waypoints={network?.waypoints || []}
         edges={network?.edges || []}
         primaryRoute={routeResult}
         secondaryRoute={compareResult?.routes?.find((r) => r.label.includes('distance')) || null}

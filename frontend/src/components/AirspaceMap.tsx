@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Polyline, Polygon, Tooltip, Popup } from 'react-leaflet';
-import type { Airport, RouteEdge, RouteDetail, CongestionCell } from '../types';
+import type { Airport, Waypoint, RouteEdge, RouteDetail, CongestionCell } from '../types';
 import { Eye, Layers } from 'lucide-react';
 
 interface AirspaceMapProps {
   airports?: Airport[];
+  waypoints?: Waypoint[];
   edges?: RouteEdge[];
   primaryRoute?: RouteDetail | null;
   secondaryRoute?: RouteDetail | null;
@@ -18,6 +19,7 @@ interface AirspaceMapProps {
 
 export const AirspaceMap: React.FC<AirspaceMapProps> = ({
   airports = [],
+  waypoints = [],
   edges = [],
   primaryRoute = null,
   secondaryRoute = null,
@@ -30,13 +32,26 @@ export const AirspaceMap: React.FC<AirspaceMapProps> = ({
 }) => {
   // Layer visibility toggles
   const [showAirports, setShowAirports] = useState(true);
+  const [showWaypoints, setShowWaypoints] = useState(true);
   const [showAirways, setShowAirways] = useState(true);
   const [showCongestion, setShowCongestion] = useState(false);
   const [showAircraft, setShowAircraft] = useState(true);
 
-  // Map airports by node_id for quick coordinates lookup
-  const airportMap = new Map<string, Airport>();
-  airports.forEach((a) => airportMap.set(a.node_id, a));
+  // Route edges may connect airports to intermediate waypoints, not only airport nodes.
+  const nodeCoordinates = new Map<string, { latitude: number; longitude: number }>();
+  airports.forEach((airport) => nodeCoordinates.set(airport.node_id, airport));
+  waypoints.forEach((waypoint) => nodeCoordinates.set(waypoint.node_id, waypoint));
+
+  const formatMapNumber = (value: unknown, decimals = 2): string => {
+    const numeric = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(numeric) ? numeric.toFixed(decimals) : '—';
+  };
+
+  const safeRouteGeometry = (route: RouteDetail | null) => (route?.geometry || []).filter(
+    (point): point is [number, number] => Array.isArray(point) && point.length >= 2 && Number.isFinite(point[0]) && Number.isFinite(point[1]),
+  );
+  const primaryGeometry = safeRouteGeometry(primaryRoute);
+  const secondaryGeometry = safeRouteGeometry(secondaryRoute);
 
   const getCellColor = (cls: string) => {
     switch (cls) {
@@ -66,6 +81,15 @@ export const AirspaceMap: React.FC<AirspaceMapProps> = ({
             className="rounded bg-aerospace-950 border-aerospace-700 text-cyan-500 focus:ring-0"
           />
           <span>Airports ({airports.length})</span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+          <input
+            type="checkbox"
+            checked={showWaypoints}
+            onChange={(e) => setShowWaypoints(e.target.checked)}
+            className="rounded bg-aerospace-950 border-aerospace-700 text-cyan-500 focus:ring-0"
+          />
+          <span>Waypoints ({waypoints.length})</span>
         </label>
         <label className="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
           <input
@@ -102,16 +126,20 @@ export const AirspaceMap: React.FC<AirspaceMapProps> = ({
         style={{ height, width: '100%' }}
         scrollWheelZoom={true}
       >
-        {/* CartoDB Dark Matter Basemap */}
+        {/* OpenStreetMap basemap: no API key required. The CSS class gives the
+            standard raster tiles a subdued dark appearance to fit Sky Force. */}
         <TileLayer
-          attribution='&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          className="skyforce-dark-osm"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
         {/* 1. Congestion Grid Cells */}
         {showCongestion &&
           congestionCells.map((c) => {
+            if (!Array.isArray(c.bounds) || c.bounds.length !== 2 || !Array.isArray(c.bounds[0]) || !Array.isArray(c.bounds[1])) return null;
             const [[sLat, wLon], [nLat, eLon]] = c.bounds;
+            if (![sLat, wLon, nLat, eLon].every((value) => Number.isFinite(value))) return null;
             const polyCoords: [number, number][] = [
               [sLat, wLon],
               [sLat, eLon],
@@ -134,7 +162,7 @@ export const AirspaceMap: React.FC<AirspaceMapProps> = ({
                   <div className="font-mono text-xs">
                     <strong>Cell {c.cell_id}</strong>
                     <div>Density: {c.predicted_class}</div>
-                    <div>Score: {c.congestion_score.toFixed(2)}</div>
+                    <div>Score: {formatMapNumber(c.congestion_score)}</div>
                     <div>Count: {c.aircraft_count}</div>
                   </div>
                 </Tooltip>
@@ -145,9 +173,9 @@ export const AirspaceMap: React.FC<AirspaceMapProps> = ({
         {/* 2. Candidate Airway Edges */}
         {showAirways &&
           edges.map((e) => {
-            const u = airportMap.get(e.source_node);
-            const v = airportMap.get(e.target_node);
-            if (!u || !v) return null;
+            const u = nodeCoordinates.get(e.source_node);
+            const v = nodeCoordinates.get(e.target_node);
+            if (!u || !v || !Number.isFinite(u.latitude) || !Number.isFinite(u.longitude) || !Number.isFinite(v.latitude) || !Number.isFinite(v.longitude)) return null;
             return (
               <Polyline
                 key={e.edge_id}
@@ -156,14 +184,14 @@ export const AirspaceMap: React.FC<AirspaceMapProps> = ({
                   [v.latitude, v.longitude],
                 ]}
                 pathOptions={{
-                  color: '#1e293b',
+                  color: '#64748b',
                   weight: 1.2,
-                  opacity: 0.6,
+                  opacity: 0.82,
                 }}
               >
                 <Tooltip sticky>
                   <span className="font-mono text-[11px]">
-                    {e.edge_id} ({e.distance_km.toFixed(0)} km)
+                    {e.edge_id} ({formatMapNumber(e.distance_km, 0)} km)
                   </span>
                 </Tooltip>
               </Polyline>
@@ -171,9 +199,9 @@ export const AirspaceMap: React.FC<AirspaceMapProps> = ({
           })}
 
         {/* 3. Secondary Route (e.g. Baseline unperturbed or alternative) */}
-        {secondaryRoute?.geometry && secondaryRoute.geometry.length > 1 && (
+        {secondaryGeometry.length > 1 && secondaryRoute && (
           <Polyline
-            positions={secondaryRoute.geometry}
+            positions={secondaryGeometry}
             pathOptions={{
               color: '#f59e0b',
               weight: 3.5,
@@ -192,9 +220,9 @@ export const AirspaceMap: React.FC<AirspaceMapProps> = ({
         )}
 
         {/* 4. Primary Route (Active / Rerouted / Selected) */}
-        {primaryRoute?.geometry && primaryRoute.geometry.length > 1 && (
+        {primaryGeometry.length > 1 && primaryRoute && (
           <Polyline
-            positions={primaryRoute.geometry}
+            positions={primaryGeometry}
             pathOptions={{
               color: '#00f0ff',
               weight: 4.5,
@@ -212,9 +240,23 @@ export const AirspaceMap: React.FC<AirspaceMapProps> = ({
           </Polyline>
         )}
 
-        {/* 5. Airports */}
+        {/* 5. Intermediate airway waypoints */}
+        {showWaypoints && waypoints.filter((waypoint) => Number.isFinite(waypoint.latitude) && Number.isFinite(waypoint.longitude)).map((waypoint) => (
+          <CircleMarker
+            key={waypoint.node_id}
+            center={[waypoint.latitude, waypoint.longitude]}
+            radius={2.8}
+            pathOptions={{ color: '#90a6c1', fillColor: '#263c56', fillOpacity: 0.95, weight: 1.2 }}
+          >
+            <Tooltip direction="top" offset={[0, -4]}>
+              <div className="font-mono text-xs"><strong>{waypoint.node_id}</strong><div>{waypoint.name}</div><div>Intermediate waypoint</div></div>
+            </Tooltip>
+          </CircleMarker>
+        ))}
+
+        {/* 6. Airports */}
         {showAirports &&
-          airports.map((a) => (
+          airports.filter((a) => Number.isFinite(a.latitude) && Number.isFinite(a.longitude)).map((a) => (
             <CircleMarker
               key={a.node_id}
               center={[a.latitude, a.longitude]}
@@ -241,7 +283,7 @@ export const AirspaceMap: React.FC<AirspaceMapProps> = ({
                   <div className="text-slate-400 font-mono text-[11px]">
                     Lat: {a.latitude.toFixed(4)}, Lon: {a.longitude.toFixed(4)}
                   </div>
-                  {a.elevation_m && (
+                  {a.elevation_m !== undefined && Number.isFinite(a.elevation_m) && (
                     <div className="text-slate-400 text-[11px]">Elevation: {a.elevation_m}m</div>
                   )}
                 </div>
@@ -249,10 +291,10 @@ export const AirspaceMap: React.FC<AirspaceMapProps> = ({
             </CircleMarker>
           ))}
 
-        {/* 6. Surveillance Aircraft */}
+        {/* 7. Surveillance Aircraft */}
         {showAircraft &&
           aircraft.map((ac, idx) => {
-            if (!ac.latitude || !ac.longitude) return null;
+            if (!Number.isFinite(ac.latitude) || !Number.isFinite(ac.longitude)) return null;
             return (
               <CircleMarker
                 key={ac.observation_id || `ac-${idx}`}
@@ -268,8 +310,8 @@ export const AirspaceMap: React.FC<AirspaceMapProps> = ({
                 <Tooltip>
                   <div className="font-mono text-xs">
                     <strong>{ac.callsign || ac.source_aircraft_id}</strong>
-                    <div>Speed: {ac.ground_speed_mps ? `${(ac.ground_speed_mps * 3.6).toFixed(0)} km/h` : 'N/A'}</div>
-                    <div>Alt: {ac.altitude_m ? `${ac.altitude_m.toFixed(0)} m` : 'N/A'}</div>
+                    <div>Speed: {Number.isFinite(ac.ground_speed_mps) ? `${(Number(ac.ground_speed_mps) * 3.6).toFixed(0)} km/h` : 'N/A'}</div>
+                    <div>Alt: {Number.isFinite(ac.altitude_m) ? `${Number(ac.altitude_m).toFixed(0)} m` : 'N/A'}</div>
                   </div>
                 </Tooltip>
               </CircleMarker>

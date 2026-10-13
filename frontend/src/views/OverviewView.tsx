@@ -1,170 +1,173 @@
 import React from 'react';
-import { 
-  Compass, 
-  Zap, 
-  AlertTriangle, 
-  Server, 
-  Cpu, 
-  MapPin, 
-  Route, 
-  ShieldCheck, 
+import {
+  Activity,
   ArrowRight,
-  Database
+  BrainCircuit,
+  Database,
+  GitBranch,
+  MapPinned,
+  Route,
+  ShieldCheck,
+  Waypoints,
 } from 'lucide-react';
-import type { AirspaceNetwork, ModelsStatusResponse } from '../types';
+import type { Airport, AirspaceNetwork, CongestionCell, ModelsStatusResponse } from '../types';
+import { AirspaceMap } from '../components/AirspaceMap';
 
 interface OverviewViewProps {
   network: AirspaceNetwork | null;
+  airports: Airport[];
   modelsStatus: ModelsStatusResponse | null;
+  congestionCells: CongestionCell[];
+  aircraft: Record<string, unknown>[];
   onNavigate: (tab: string) => void;
 }
 
-export const OverviewView: React.FC<OverviewViewProps> = ({ network, modelsStatus, onNavigate }) => {
+const formatCount = (value: number | undefined | null) => value == null ? '—' : value.toLocaleString();
+
+export const OverviewView: React.FC<OverviewViewProps> = ({
+  network,
+  airports,
+  modelsStatus,
+  congestionCells,
+  aircraft,
+  onNavigate,
+}) => {
+  const congestionLoaded = modelsStatus?.congestion_model?.is_loaded === true;
+  const etaLoaded = modelsStatus?.eta_model?.is_loaded === true;
+  const loadedModels = [congestionLoaded, etaLoaded].filter(Boolean).length;
+
+  const statCards = [
+    { label: 'Airports', value: formatCount(network?.total_airports ?? (airports.length || null)), sub: 'Reference nodes', icon: MapPinned, accent: 'cyan' },
+    { label: 'Waypoints', value: formatCount(network?.total_waypoints), sub: 'Intermediate nodes', icon: Waypoints, accent: 'blue' },
+    { label: 'Airway segments', value: formatCount(network?.total_edges), sub: 'Graph connections', icon: GitBranch, accent: 'violet' },
+    { label: 'ML models loaded', value: modelsStatus ? `${loadedModels} / 2` : '—', sub: modelsStatus ? `${congestionLoaded ? 'Classifier ready' : 'Classifier unavailable'} · ${etaLoaded ? 'ETA ready' : 'ETA unavailable'}` : 'Model status unavailable', icon: BrainCircuit, accent: modelsStatus && loadedModels === 2 ? 'green' : 'amber' },
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* Welcome & Mission Control Header */}
-      <div className="bg-gradient-to-r from-aerospace-900 via-aerospace-850 to-aerospace-900 border border-aerospace-700/80 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-cyan-500/10 to-transparent pointer-events-none" />
-        <div className="relative z-10 max-w-3xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/80 text-cyan-300 border border-cyan-800 text-xs font-mono font-medium mb-3">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-            RESEARCH SYSTEM ACTIVE • INDIAN SUBCONTINENT CORRIDOR
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Sky Force Airspace Intelligence & Routing Engine
-          </h2>
-          <p className="mt-2 text-sm text-slate-300 leading-relaxed">
-            An integrated academic research prototype investigating historical aircraft observation modeling, 
-            machine-learning congestion and travel-time forecasting, multi-objective graph routing, and dynamic 
-            rerouting under simulated airspace disruptions.
+    <div className="space-y-5 page-overview">
+      <section className="overview-intro">
+        <div className="overview-intro-copy">
+          <div className="section-kicker"><span className="kicker-dot" /> AIRSPACE DECISION SUPPORT · INDIA</div>
+          <h2>See the airspace.<br /><span>Anticipate what changes next.</span></h2>
+          <p>
+            Explore aircraft observations, inspect machine-learning forecasts, and compare routes under
+            weather, congestion, and simulated corridor disruptions.
           </p>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <button
-              onClick={() => onNavigate('routing')}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-aerospace-950 font-bold text-xs font-mono transition-shadow shadow-md shadow-cyan-500/20"
-            >
-              <Compass className="w-4 h-4" />
-              LAUNCH ROUTE LAB
-              <ArrowRight className="w-3.5 h-3.5" />
+          <div className="overview-actions">
+            <button type="button" className="action-primary" onClick={() => onNavigate('routing')}>
+              <Route size={16} /> Plan a route <ArrowRight size={15} />
             </button>
-            <button
-              onClick={() => onNavigate('scenarios')}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-aerospace-800 hover:bg-aerospace-700 text-white font-medium text-xs font-mono border border-aerospace-600 transition"
-            >
-              <Zap className="w-4 h-4 text-amber-400" />
-              SCENARIO STUDIO (REROUTE)
+            <button type="button" className="action-secondary" onClick={() => onNavigate('congestion')}>
+              <BrainCircuit size={16} /> Inspect ML models
             </button>
           </div>
         </div>
-      </div>
-
-      {/* KPI Stats Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-3.5">
-          <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-[11px] font-mono uppercase">Airports</span>
-            <MapPin className="w-4 h-4 text-cyan-400" />
-          </div>
-          <div className="text-xl font-bold font-mono text-white">
-            {network?.total_airports || 19}
-          </div>
-          <div className="text-[10px] text-slate-400 font-mono mt-1">OurAirports verified</div>
+        <div className="overview-intro-mark" aria-hidden="true">
+          <div className="radar-ring radar-ring-one" />
+          <div className="radar-ring radar-ring-two" />
+          <div className="radar-ring radar-ring-three" />
+          <div className="radar-sweep" />
+          <div className="radar-center"><Route size={25} /></div>
+          <span className="radar-point radar-point-a" />
+          <span className="radar-point radar-point-b" />
+          <span className="radar-point radar-point-c" />
         </div>
+      </section>
 
-        <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-3.5">
-          <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-[11px] font-mono uppercase">Waypoints</span>
-            <Route className="w-4 h-4 text-slate-400" />
-          </div>
-          <div className="text-xl font-bold font-mono text-white">
-            {network?.total_waypoints || 40}
-          </div>
-          <div className="text-[10px] text-slate-400 font-mono mt-1">Corridor grid nodes</div>
-        </div>
+      <section className="stats-grid" aria-label="System summary">
+        {statCards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <article className={`stat-card accent-${card.accent}`} key={card.label}>
+              <div className="stat-card-top"><span>{card.label}</span><Icon size={17} /></div>
+              <div className="stat-card-value">{card.value}</div>
+              <div className="stat-card-subtitle">{card.sub}</div>
+            </article>
+          );
+        })}
+      </section>
 
-        <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-3.5">
-          <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-[11px] font-mono uppercase">Airway Edges</span>
-            <Route className="w-4 h-4 text-cyan-400" />
+      <section className="overview-grid">
+        <article className="surface-card overview-map-card">
+          <div className="surface-card-heading">
+            <div>
+              <p className="eyebrow">GEOSPATIAL WORKSPACE</p>
+              <h3>Airspace network</h3>
+              <p className="surface-subtitle">Select an airport marker or use the map layers to inspect the corridor.</p>
+            </div>
+            <button className="text-action" type="button" onClick={() => onNavigate('explorer')}>Open explorer <ArrowRight size={14} /></button>
           </div>
-          <div className="text-xl font-bold font-mono text-white">
-            {network?.total_edges || 276}
+          <AirspaceMap
+            airports={airports}
+            waypoints={network?.waypoints || []}
+            edges={network?.edges || []}
+            congestionCells={congestionCells}
+            aircraft={aircraft}
+            height="440px"
+          />
+          <div className="map-legend-row">
+            <span><i className="legend-dot legend-airport" /> Airports</span>
+            <span><i className="legend-line legend-airway" /> Airways</span>
+            <span><i className="legend-dot legend-aircraft" /> Observations</span>
+            <span><i className="legend-dot legend-congestion" /> Congestion overlay (toggle on map)</span>
           </div>
-          <div className="text-[10px] text-slate-400 font-mono mt-1">Directed segments</div>
-        </div>
+        </article>
 
-        <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-3.5">
-          <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-[11px] font-mono uppercase">Congestion Model</span>
-            <Cpu className="w-4 h-4 text-emerald-400" />
-          </div>
-          <div className="text-xl font-bold font-mono text-emerald-400">
-            {modelsStatus?.congestion_model ? '84.7%' : 'ACTIVE'}
-          </div>
-          <div className="text-[10px] text-slate-400 font-mono mt-1">Test Acc (Random Forest)</div>
-        </div>
+        <aside className="overview-side-stack">
+          <article className="surface-card model-status-card">
+            <div className="surface-card-heading compact-heading">
+              <div><p className="eyebrow">INFERENCE READINESS</p><h3>Model status</h3></div>
+              <BrainCircuit size={19} className="text-cyan-300" />
+            </div>
+            <div className="model-status-row">
+              <div className="model-status-icon"><Activity size={16} /></div>
+              <div className="model-status-copy"><strong>Congestion classifier</strong><span>{modelsStatus?.congestion_model?.name || (modelsStatus ? 'Model metadata unavailable' : 'Awaiting model status')}</span></div>
+              <span className={`status-tag ${congestionLoaded ? 'tag-good' : 'tag-muted'}`}>{!modelsStatus ? 'STATUS UNKNOWN' : congestionLoaded ? 'LOADED' : 'NOT LOADED'}</span>
+            </div>
+            <div className="model-status-row">
+              <div className="model-status-icon model-status-icon-blue"><Route size={16} /></div>
+              <div className="model-status-copy"><strong>Segment ETA regressor</strong><span>{modelsStatus?.eta_model?.name || (modelsStatus ? 'Model metadata unavailable' : 'Awaiting model status')}</span></div>
+              <span className={`status-tag ${etaLoaded ? 'tag-good' : 'tag-muted'}`}>{!modelsStatus ? 'STATUS UNKNOWN' : etaLoaded ? 'LOADED' : 'NOT LOADED'}</span>
+            </div>
+            {!modelsStatus && <p className="inline-note"><Database size={14} /> Model status is unavailable. Check that the backend and model artifacts are ready.</p>}
+            <button type="button" className="full-width-link" onClick={() => onNavigate('evaluation')}>View evaluation evidence <ArrowRight size={14} /></button>
+          </article>
 
-        <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-3.5">
-          <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-[11px] font-mono uppercase">ETA Regressor</span>
-            <Cpu className="w-4 h-4 text-cyan-400" />
-          </div>
-          <div className="text-xl font-bold font-mono text-cyan-400">
-            {modelsStatus?.eta_model ? '0.96 min' : '0.96 min'}
-          </div>
-          <div className="text-[10px] text-slate-400 font-mono mt-1">Test MAE (R² 0.937)</div>
-        </div>
+          <article className="surface-card pipeline-card">
+            <div className="surface-card-heading compact-heading">
+              <div><p className="eyebrow">END-TO-END FLOW</p><h3>From observations to routes</h3></div>
+              <GitBranch size={19} className="text-cyan-300" />
+            </div>
+            <div className="pipeline-steps">
+              <div className="pipeline-step"><span className="pipeline-step-number">01</span><span><strong>Ingest & validate</strong><small>Observations · weather · QA</small></span></div>
+              <div className="pipeline-connector" />
+              <div className="pipeline-step"><span className="pipeline-step-number">02</span><span><strong>Predict</strong><small>Congestion class · segment ETA</small></span></div>
+              <div className="pipeline-connector" />
+              <div className="pipeline-step"><span className="pipeline-step-number">03</span><span><strong>Optimize & evaluate</strong><small>A* / Dijkstra · scenario rerouting</small></span></div>
+            </div>
+            <div className="provenance-note"><ShieldCheck size={15} /><span>Research dataset. Synthetic and observed records must remain clearly distinguished.</span></div>
+            <button type="button" className="full-width-link" onClick={() => onNavigate('quality')}>Inspect data & provenance <ArrowRight size={14} /></button>
+          </article>
+        </aside>
+      </section>
 
-        <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-3.5">
-          <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-[11px] font-mono uppercase">Database</span>
-            <Database className="w-4 h-4 text-purple-400" />
-          </div>
-          <div className="text-xl font-bold font-mono text-purple-300">
-            SQLite
-          </div>
-          <div className="text-[10px] text-slate-400 font-mono mt-1">WAL Mode Enabled</div>
-        </div>
-      </div>
-
-      {/* Core Research Questions Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-5 space-y-2.5">
-          <div className="flex items-center gap-2 text-cyan-400 font-mono text-xs font-semibold">
-            <span className="w-5 h-5 rounded bg-cyan-950 flex items-center justify-center border border-cyan-800">1</span>
-            SPATIAL TRAFFIC DENSITY
-          </div>
-          <h3 className="text-base font-bold text-white">Aggregated Observation Modeling</h3>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Raw trajectory observations mapped into half-open 2° spatial grid cells with 15-minute intervals. 
-            Causal rolling counts and 8-neighbor spatial indicators model density across the subcontinent.
-          </p>
-        </div>
-
-        <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-5 space-y-2.5">
-          <div className="flex items-center gap-2 text-amber-400 font-mono text-xs font-semibold">
-            <span className="w-5 h-5 rounded bg-amber-950 flex items-center justify-center border border-amber-800">2</span>
-            LEAKAGE-FREE FORECASTING
-          </div>
-          <h3 className="text-base font-bold text-white">Future Window Prediction</h3>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Machine-learning models predict congestion classification for the NEXT 15-minute window strictly using 
-            features available before window inception. Split chronologically into Train, Validation, and Test sets.
-          </p>
-        </div>
-
-        <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-5 space-y-2.5">
-          <div className="flex items-center gap-2 text-emerald-400 font-mono text-xs font-semibold">
-            <span className="w-5 h-5 rounded bg-emerald-950 flex items-center justify-center border border-emerald-800">3</span>
-            MULTI-OBJECTIVE ROUTING
-          </div>
-          <h3 className="text-base font-bold text-white">Explainable Graph Optimization</h3>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Transparent edge cost model balancing distance, travel time, weather penalty, and congestion exposure. 
-            Dijkstra and A* with admissible great-circle heuristics deliver provably optimal paths.
-          </p>
-        </div>
-      </div>
+      <section className="quick-path-grid">
+        <button type="button" className="quick-path-card" onClick={() => onNavigate('congestion')}>
+          <span className="quick-path-icon cyan-icon"><BrainCircuit size={19} /></span>
+          <span><strong>Congestion Intelligence</strong><small>Inspect model readiness, predictions, and feature importance.</small></span>
+          <ArrowRight size={16} />
+        </button>
+        <button type="button" className="quick-path-card" onClick={() => onNavigate('routing')}>
+          <span className="quick-path-icon blue-icon"><Route size={19} /></span>
+          <span><strong>Route Optimization</strong><small>Compare distance, travel time, weather, and congestion costs.</small></span>
+          <ArrowRight size={16} />
+        </button>
+        <button type="button" className="quick-path-card" onClick={() => onNavigate('scenarios')}>
+          <span className="quick-path-icon amber-icon"><Activity size={19} /></span>
+          <span><strong>Disruption Simulation</strong><small>Activate a scenario and compare a rerouted path.</small></span>
+          <ArrowRight size={16} />
+        </button>
+      </section>
     </div>
   );
 };

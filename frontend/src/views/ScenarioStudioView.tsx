@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Zap, 
   RotateCcw, 
@@ -29,7 +29,7 @@ export const ScenarioStudioView: React.FC<ScenarioStudioViewProps> = ({
   airports,
   network,
 }) => {
-  const [selectedScenarioId, setSelectedScenarioId] = useState<string>('corridor-closure');
+  const [selectedScenarioId, setSelectedScenarioId] = useState<string>('');
   const [origin, setOrigin] = useState<string>('VIDP');
   const [destination, setDestination] = useState<string>('VABB');
   const [rerouteLoading, setRerouteLoading] = useState(false);
@@ -37,7 +37,17 @@ export const ScenarioStudioView: React.FC<ScenarioStudioViewProps> = ({
   const [rerouteResult, setRerouteResult] = useState<DynamicRerouteResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedScenario = scenarios.find((s) => s.id === selectedScenarioId) || scenarios[0];
+  const selectedScenario = scenarios.find((s) => s.id === selectedScenarioId) || scenarios.find((s) => s.is_active) || scenarios[0];
+
+  useEffect(() => {
+    if (!scenarios.length) {
+      setSelectedScenarioId('');
+      return;
+    }
+    if (!scenarios.some((scenario) => scenario.id === selectedScenarioId)) {
+      setSelectedScenarioId((scenarios.find((scenario) => scenario.is_active) || scenarios[0]).id);
+    }
+  }, [scenarios, selectedScenarioId]);
 
   const handleActivate = async (id: string) => {
     setActionLoading(id);
@@ -70,7 +80,7 @@ export const ScenarioStudioView: React.FC<ScenarioStudioViewProps> = ({
     setError(null);
     try {
       const res = await api.dynamicReroute({
-        scenario_id: selectedScenarioId,
+        scenario_id: selectedScenario?.id || selectedScenarioId,
         origin,
         destination,
         objective: 'balanced',
@@ -118,7 +128,7 @@ export const ScenarioStudioView: React.FC<ScenarioStudioViewProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handleDynamicReroute}
-              disabled={rerouteLoading}
+              disabled={rerouteLoading || !selectedScenario}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-aerospace-950 font-bold text-xs font-mono transition shadow-md shadow-amber-500/20 disabled:opacity-50"
             >
               <Split className="w-4 h-4" />
@@ -135,15 +145,23 @@ export const ScenarioStudioView: React.FC<ScenarioStudioViewProps> = ({
         )}
       </div>
 
-      {/* Scenario Selector Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+      {/* Scenario selector: compact choice grid above the baseline/alternative comparison. */}
+      {scenarios.length === 0 ? (
+        <div className="empty-state"><Zap size={22} /><h3>No scenarios returned by the API</h3><p>Check that the backend is running and that GET /api/scenarios returns the prebuilt scenarios.</p></div>
+      ) : null}
+      <div className="scenario-workspace">
+        <div className="grid grid-cols-1 gap-3.5 scenario-grid">
         {scenarios.map((sc) => {
           const isSelected = selectedScenarioId === sc.id;
           return (
             <div
+              role="button"
+              tabIndex={0}
               key={sc.id}
               onClick={() => setSelectedScenarioId(sc.id)}
-              className={`p-4 rounded-xl border cursor-pointer transition relative overflow-hidden ${
+              onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedScenarioId(sc.id); } }}
+              aria-pressed={isSelected}
+              className={`scenario-choice p-4 rounded-xl border cursor-pointer transition relative overflow-hidden text-left ${
                 isSelected
                   ? 'bg-aerospace-850 border-amber-500/60 shadow-lg shadow-amber-500/5'
                   : 'bg-aerospace-900 border-aerospace-800 hover:border-aerospace-700'
@@ -169,7 +187,7 @@ export const ScenarioStudioView: React.FC<ScenarioStudioViewProps> = ({
               </p>
 
               <div className="flex items-center justify-between text-[11px] font-mono pt-3 border-t border-aerospace-800/60">
-                <span className="text-slate-400">{sc.events.length} simulated event(s)</span>
+                <span className="text-slate-400">{sc.events?.length ?? 0} simulated event(s)</span>
                 <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                   {sc.is_active ? (
                     <button
@@ -193,6 +211,33 @@ export const ScenarioStudioView: React.FC<ScenarioStudioViewProps> = ({
             </div>
           );
         })}
+        </div>
+        {!rerouteResult && (
+          <aside className="surface-card scenario-map-preview">
+            <div className="surface-card-heading">
+              <div>
+                <p className="eyebrow">SCENARIO CONTEXT</p>
+                <h3>Airway network preview</h3>
+                <p className="surface-subtitle">Select a scenario, activate it, then evaluate the reroute to compare baseline and adapted paths.</p>
+              </div>
+              <span className="status-tag tag-amber">SIMULATION</span>
+            </div>
+            <AirspaceMap
+              airports={airports}
+              waypoints={network?.waypoints || []}
+              edges={network?.edges || []}
+              height="500px"
+            />
+            <div className="scenario-preview-caption">
+              <span><i className="legend-line legend-airway" /> Network edges</span>
+              <span><i className="legend-dot legend-airport" /> Airport nodes</span>
+            </div>
+            <div className="scenario-selected-summary">
+              <span className="scenario-summary-icon"><Zap size={16} /></span>
+              <div><strong>{selectedScenario?.name || 'Choose a scenario'}</strong><p>{selectedScenario?.description || 'No scenario has been returned by the backend yet.'}</p></div>
+            </div>
+          </aside>
+        )}
       </div>
 
       {/* Map Comparison & Delta Panel if Dynamic Reroute was Run */}
@@ -203,6 +248,7 @@ export const ScenarioStudioView: React.FC<ScenarioStudioViewProps> = ({
             <div className="lg:col-span-2">
               <AirspaceMap
                 airports={airports}
+                waypoints={network?.waypoints || []}
                 edges={network?.edges || []}
                 primaryRoute={rerouteResult.rerouted_route}
                 secondaryRoute={rerouteResult.baseline_route}

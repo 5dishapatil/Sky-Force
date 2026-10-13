@@ -1,244 +1,188 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  FlaskConical, 
-  Cpu, 
-  Play, 
-  CheckCircle2, 
-  AlertCircle, 
-  Table, 
-  Activity, 
-  Layers 
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Activity, AlertCircle, CheckCircle2, FileJson, Play, RefreshCw } from 'lucide-react';
 import { api } from '../services/api';
+import type { ModelsStatusResponse } from '../types';
+import { asRecord, findCandidateMetricRows, findMetric, findNamedSection, formatNumber, formatPercent } from '../services/metricUtils';
 
-export const ModelEvaluationView: React.FC = () => {
-  const [metrics, setMetrics] = useState<any>(null);
-  const [experimentResult, setExperimentResult] = useState<any>(null);
-  const [runningExp, setRunningExp] = useState<boolean>(false);
+interface ModelEvaluationViewProps {
+  modelsStatus?: ModelsStatusResponse | null;
+}
+
+const MetricCard: React.FC<{ label: string; value: string; note: string }> = ({ label, value, note }) => (
+  <div className="evaluation-metric-card">
+    <span>{label}</span>
+    <strong>{value}</strong>
+    <small>{note}</small>
+  </div>
+);
+
+export const ModelEvaluationView: React.FC<ModelEvaluationViewProps> = ({ modelsStatus = null }) => {
+  const [metrics, setMetrics] = useState<unknown>(null);
+  const [loadingMetrics, setLoadingMetrics] = useState(true);
+  const [metricsError, setMetricsError] = useState<string | null>(null);
+  const [experimentResult, setExperimentResult] = useState<Record<string, unknown> | null>(null);
+  const [runningExp, setRunningExp] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchMetrics = async () => {
-      try {
-        const res = await api.getModelsMetrics();
-        setMetrics(res);
-      } catch (e: any) {
-        console.error(e);
-      }
-    };
-    fetchMetrics();
-  }, []);
+  const loadMetrics = async () => {
+    setLoadingMetrics(true);
+    setMetricsError(null);
+    try {
+      const result = await api.getModelsMetrics();
+      setMetrics(result);
+    } catch (loadError) {
+      setMetricsError(loadError instanceof Error ? loadError.message : 'Model metrics could not be loaded.');
+    } finally {
+      setLoadingMetrics(false);
+    }
+  };
+
+  useEffect(() => { void loadMetrics(); }, []);
+
+  const congestionSection = findNamedSection(metrics, ['congestion']) || asRecord(modelsStatus?.congestion_model?.metrics) || null;
+  const etaSection = findNamedSection(metrics, ['eta', 'regression']) || asRecord(modelsStatus?.eta_model?.metrics) || null;
+
+  const classifierAccuracy = findMetric(congestionSection, ['test_accuracy', 'accuracy', 'accuracy_score']);
+  const classifierBalanced = findMetric(congestionSection, ['balanced_accuracy', 'balanced_acc']);
+  const classifierF1 = findMetric(congestionSection, ['macro_f1', 'f1_macro', 'macro_f1_score']);
+  const etaMae = findMetric(etaSection, ['test_mae', 'mae', 'mean_absolute_error']);
+  const etaRmse = findMetric(etaSection, ['test_rmse', 'rmse', 'root_mean_squared_error']);
+  const etaR2 = findMetric(etaSection, ['test_r2', 'r2', 'r2_score', 'r_squared']);
+  const classificationCandidates = findCandidateMetricRows(metrics, 'classification');
+  const regressionCandidates = findCandidateMetricRows(metrics, 'regression');
 
   const handleRunBenchmark = async () => {
     setRunningExp(true);
     setError(null);
     try {
-      const res = await api.runExperiment({
+      const result = await api.runExperiment({
         od_pairs: [['VIDP', 'VABB'], ['VABB', 'VIDP']],
         scenario_ids: ['clear', 'corridor-congestion', 'corridor-closure'],
         algorithm: 'dijkstra',
       });
-      setExperimentResult(res);
-    } catch (err: any) {
-      setError(err.message || 'Failed to run benchmark experiment');
+      setExperimentResult(asRecord(result) || { result });
+    } catch (runError) {
+      setError(runError instanceof Error ? runError.message : 'Failed to run benchmark experiment.');
     } finally {
       setRunningExp(false);
     }
   };
 
+  const congestionModel = modelsStatus?.congestion_model;
+  const etaModel = modelsStatus?.eta_model;
+  const reportAvailable = metrics !== null && metrics !== undefined;
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-5 shadow-lg">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-6 page-model-evaluation">
+      <section className="view-hero view-hero-cyan">
+        <div className="view-hero-copy">
+          <p className="eyebrow">SCIENTIFIC VALIDATION</p>
+          <h2>Model evaluation & benchmarking</h2>
+          <p>Inspect saved evaluation results, verify which artifacts are loaded, and run a route benchmark against configured scenarios.</p>
+        </div>
+        <div className="view-hero-actions">
+          <button type="button" className="action-secondary" onClick={() => void loadMetrics()} disabled={loadingMetrics}><RefreshCw size={15} /> Refresh reports</button>
+          <button type="button" className="action-primary" onClick={handleRunBenchmark} disabled={runningExp}><Play size={15} /> {runningExp ? 'Running…' : 'Run route benchmark'}</button>
+        </div>
+      </section>
+
+      {metricsError && <div className="view-inline-error" role="alert"><AlertCircle size={16} /><div><strong>Saved metrics unavailable</strong><p>{metricsError}</p></div></div>}
+      {error && <div className="view-inline-error" role="alert"><AlertCircle size={16} /><div><strong>Benchmark failed</strong><p>{error}</p></div></div>}
+
+      <section className="evaluation-section-grid">
+        <article className="surface-card evaluation-model-panel">
+          <div className="surface-card-heading">
+            <div><p className="eyebrow">MODEL A · CLASSIFICATION</p><h3>Congestion classifier</h3><p className="surface-subtitle">Forecasts LOW / MEDIUM / HIGH traffic class for the next 15-minute window.</p></div>
+            <span className={`status-tag ${congestionModel?.is_loaded ? 'tag-good' : 'tag-muted'}`}>{!modelsStatus ? 'STATUS UNKNOWN' : congestionModel?.is_loaded ? 'LOADED' : 'NOT LOADED'}</span>
+          </div>
+          <div className="model-fact-grid">
+            <div><span>Algorithm</span><strong>{congestionModel?.name || 'Random Forest'}</strong></div>
+            <div><span>Version</span><strong>{congestionModel?.version || '—'}</strong></div>
+            <div><span>Features</span><strong>{congestionModel?.feature_count ?? '—'}</strong></div>
+            <div><span>Artifact SHA-256</span><strong title={congestionModel?.sha256 || 'Not reported'}>{congestionModel?.sha256 ? `${congestionModel.sha256.slice(0, 12)}…` : 'Not reported'}</strong></div>
+          </div>
+          <div className="evaluation-metric-grid">
+            <MetricCard label="Test accuracy" value={formatPercent(classifierAccuracy)} note="From returned evaluation data" />
+            <MetricCard label="Balanced accuracy" value={formatPercent(classifierBalanced)} note="Class-balanced performance" />
+            <MetricCard label="Macro-F1" value={formatNumber(classifierF1, 4)} note="Equal weight per class" />
+          </div>
+        </article>
+
+        <article className="surface-card evaluation-model-panel">
+          <div className="surface-card-heading">
+            <div><p className="eyebrow">MODEL B · REGRESSION</p><h3>Segment ETA regressor</h3><p className="surface-subtitle">Estimates the traversal time of each airway segment in minutes.</p></div>
+            <span className={`status-tag ${etaModel?.is_loaded ? 'tag-good' : 'tag-muted'}`}>{!modelsStatus ? 'STATUS UNKNOWN' : etaModel?.is_loaded ? 'LOADED' : 'NOT LOADED'}</span>
+          </div>
+          <div className="model-fact-grid">
+            <div><span>Algorithm</span><strong>{etaModel?.name || 'Random Forest regressor'}</strong></div>
+            <div><span>Version</span><strong>{etaModel?.version || '—'}</strong></div>
+            <div><span>Features</span><strong>{etaModel?.feature_count ?? '—'}</strong></div>
+            <div><span>Artifact SHA-256</span><strong title={etaModel?.sha256 || 'Not reported'}>{etaModel?.sha256 ? `${etaModel.sha256.slice(0, 12)}…` : 'Not reported'}</strong></div>
+          </div>
+          <div className="evaluation-metric-grid">
+            <MetricCard label="Test MAE" value={etaMae === null ? '—' : `${formatNumber(etaMae, 3)} min`} note="Lower is better" />
+            <MetricCard label="Test RMSE" value={etaRmse === null ? '—' : `${formatNumber(etaRmse, 3)} min`} note="Penalizes larger errors" />
+            <MetricCard label="R² score" value={formatNumber(etaR2, 4)} note="Fit versus mean baseline" />
+          </div>
+        </article>
+      </section>
+
+      <section className="surface-card candidate-benchmarks-panel">
+        <div className="surface-card-heading">
+          <div><p className="eyebrow">BASELINE COMPARISON</p><h3>Candidate model results</h3><p className="surface-subtitle">Tables are built from candidate-level records returned by the saved metrics API; no sample scores are inserted by the frontend.</p></div>
+          <FlaskConicalIcon />
+        </div>
+        <div className="candidate-tables-grid">
           <div>
-            <h2 className="text-lg font-bold text-white flex items-center gap-2 font-mono">
-              <FlaskConical className="w-5 h-5 text-cyan-400" />
-              SCIENTIFIC MODEL EVALUATION & BENCHMARKING
-            </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Transparent, honest evaluation against classical and baseline models under strict chronological splits
-            </p>
+            <h4>Congestion classification</h4>
+            {classificationCandidates.length ? (
+              <div className="overflow-x-auto"><table className="candidate-comparison-table w-full text-left text-xs">
+                <thead><tr><th>Candidate</th><th>Accuracy</th><th>Balanced accuracy</th><th>Macro-F1</th></tr></thead>
+                <tbody>{classificationCandidates.map((row, index) => <tr key={`${row.name}-${index}`}><td>{row.name}</td><td>{formatPercent(row.accuracy)}</td><td>{formatPercent(row.balancedAccuracy)}</td><td>{formatNumber(row.macroF1, 4)}</td></tr>)}</tbody>
+              </table></div>
+            ) : <p className="candidate-empty-note">No candidate-level classifier table was found in the metrics response. Inspect the raw report below for the available fields.</p>}
           </div>
-
-          <button
-            onClick={handleRunBenchmark}
-            disabled={runningExp}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-aerospace-950 font-bold text-xs font-mono transition shadow-md shadow-cyan-500/20 disabled:opacity-50"
-          >
-            <Play className="w-3.5 h-3.5 fill-current" />
-            {runningExp ? 'RUNNING EXPERIMENT...' : 'RUN BENCHMARK EXPERIMENT'}
-          </button>
+          <div>
+            <h4>Segment ETA regression</h4>
+            {regressionCandidates.length ? (
+              <div className="overflow-x-auto"><table className="candidate-comparison-table w-full text-left text-xs">
+                <thead><tr><th>Candidate</th><th>MAE</th><th>RMSE</th><th>R²</th></tr></thead>
+                <tbody>{regressionCandidates.map((row, index) => <tr key={`${row.name}-${index}`}><td>{row.name}</td><td>{row.mae === null ? '—' : `${formatNumber(row.mae)} min`}</td><td>{row.rmse === null ? '—' : `${formatNumber(row.rmse)} min`}</td><td>{formatNumber(row.r2, 4)}</td></tr>)}</tbody>
+              </table></div>
+            ) : <p className="candidate-empty-note">No candidate-level regressor table was found in the metrics response. Inspect the raw report below for the available fields.</p>}
+          </div>
         </div>
+      </section>
 
-        {error && (
-          <div className="mt-4 p-3 rounded-lg bg-red-950/60 border border-red-800 text-red-200 text-xs">
-            {error}
-          </div>
+      <section className="surface-card evaluation-integrity-panel">
+        <div className="surface-card-heading">
+          <div><p className="eyebrow">REPRODUCIBILITY & INTEGRITY</p><h3>What this page can verify</h3></div>
+          <ShieldCheckIcon />
+        </div>
+        <div className="integrity-check-grid">
+          <div className="integrity-check"><CheckCircle2 size={17} /><span><strong>Artifact load status</strong><small>{modelsStatus ? 'Read from /api/models/status' : 'Model status API has not returned data'}</small></span></div>
+          <div className="integrity-check"><CheckCircle2 size={17} /><span><strong>Metric source</strong><small>{reportAvailable ? 'Loaded from /api/models/metrics' : 'No report payload is available yet'}</small></span></div>
+          <div className="integrity-check"><Activity size={17} /><span><strong>Evaluation split</strong><small>Confirm the chronological split details in the saved training report.</small></span></div>
+        </div>
+        {loadingMetrics && <div className="loading-strip"><span className="loading-spinner" /> Loading model evaluation reports…</div>}
+        {reportAvailable && (
+          <details className="raw-report-details">
+            <summary><FileJson size={15} /> Inspect raw metrics response</summary>
+            <pre>{JSON.stringify(metrics, null, 2)}</pre>
+          </details>
         )}
-      </div>
+        {!reportAvailable && !loadingMetrics && !metricsError && <p className="empty-report-note">The endpoint returned no metrics payload. Run model training and confirm the report files are exposed by the backend before presenting scores.</p>}
+      </section>
 
-      {/* Model Benchmark Comparison Tables */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Congestion Model Comparison */}
-        <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-5 space-y-3 shadow-lg">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white font-mono flex items-center gap-2">
-              <Cpu className="w-4 h-4 text-emerald-400" />
-              CONGESTION CLASSIFIER BENCHMARK
-            </h3>
-            <span className="text-[11px] font-mono text-emerald-400 font-bold">Winner: Random Forest</span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-aerospace-950 text-slate-400 border-b border-aerospace-800">
-                <tr>
-                  <th className="py-2.5 px-3">Candidate Model</th>
-                  <th className="py-2.5 px-3">Accuracy</th>
-                  <th className="py-2.5 px-3">Balanced Acc</th>
-                  <th className="py-2.5 px-3">Macro-F1</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-aerospace-800 text-slate-300">
-                <tr className="hover:bg-aerospace-850/50">
-                  <td className="py-2.5 px-3 text-slate-400">Dummy (Zero-R Baseline)</td>
-                  <td className="py-2.5 px-3">88.3%</td>
-                  <td className="py-2.5 px-3">33.3%</td>
-                  <td className="py-2.5 px-3 text-red-400 font-bold">0.313</td>
-                </tr>
-                <tr className="hover:bg-aerospace-850/50">
-                  <td className="py-2.5 px-3 text-slate-300">Logistic Regression</td>
-                  <td className="py-2.5 px-3">82.1%</td>
-                  <td className="py-2.5 px-3">63.5%</td>
-                  <td className="py-2.5 px-3">0.583</td>
-                </tr>
-                <tr className="bg-emerald-950/20 border-l-2 border-emerald-400">
-                  <td className="py-2.5 px-3 font-bold text-emerald-300">Random Forest (Selected)</td>
-                  <td className="py-2.5 px-3 font-bold text-white">84.7%</td>
-                  <td className="py-2.5 px-3 font-bold text-white">71.4%</td>
-                  <td className="py-2.5 px-3 font-bold text-emerald-400">0.636</td>
-                </tr>
-                <tr className="hover:bg-aerospace-850/50">
-                  <td className="py-2.5 px-3 text-slate-300">Hist Gradient Boosting</td>
-                  <td className="py-2.5 px-3">84.2%</td>
-                  <td className="py-2.5 px-3">69.8%</td>
-                  <td className="py-2.5 px-3">0.628</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p className="text-[11px] text-slate-400 font-mono">
-            Evaluated out-of-sample on 16,999 test records without target leakage.
-          </p>
-        </div>
-
-        {/* ETA Regressor Comparison */}
-        <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-5 space-y-3 shadow-lg">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white font-mono flex items-center gap-2">
-              <Cpu className="w-4 h-4 text-cyan-400" />
-              SEGMENT ETA REGRESSOR BENCHMARK
-            </h3>
-            <span className="text-[11px] font-mono text-cyan-400 font-bold">Winner: Random Forest</span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-aerospace-950 text-slate-400 border-b border-aerospace-800">
-                <tr>
-                  <th className="py-2.5 px-3">Candidate Model</th>
-                  <th className="py-2.5 px-3">MAE (min)</th>
-                  <th className="py-2.5 px-3">RMSE (min)</th>
-                  <th className="py-2.5 px-3">R² Score</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-aerospace-800 text-slate-300">
-                <tr className="hover:bg-aerospace-850/50">
-                  <td className="py-2.5 px-3 text-slate-400">Dummy (Mean Baseline)</td>
-                  <td className="py-2.5 px-3 text-red-400 font-bold">4.82 min</td>
-                  <td className="py-2.5 px-3">6.35 min</td>
-                  <td className="py-2.5 px-3">0.000</td>
-                </tr>
-                <tr className="hover:bg-aerospace-850/50">
-                  <td className="py-2.5 px-3 text-slate-300">Ridge Linear Regressor</td>
-                  <td className="py-2.5 px-3">1.28 min</td>
-                  <td className="py-2.5 px-3">1.92 min</td>
-                  <td className="py-2.5 px-3">0.908</td>
-                </tr>
-                <tr className="bg-cyan-950/20 border-l-2 border-cyan-400">
-                  <td className="py-2.5 px-3 font-bold text-cyan-300">Random Forest (Selected)</td>
-                  <td className="py-2.5 px-3 font-bold text-white">0.96 min</td>
-                  <td className="py-2.5 px-3 font-bold text-white">1.60 min</td>
-                  <td className="py-2.5 px-3 font-bold text-cyan-400">0.937</td>
-                </tr>
-                <tr className="hover:bg-aerospace-850/50">
-                  <td className="py-2.5 px-3 text-slate-300">Hist Gradient Boosting</td>
-                  <td className="py-2.5 px-3">1.02 min</td>
-                  <td className="py-2.5 px-3">1.69 min</td>
-                  <td className="py-2.5 px-3">0.930</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p className="text-[11px] text-slate-400 font-mono">
-            Tested on 5,798 segment traversals. R² of 0.937 demonstrates strong explanatory fit.
-          </p>
-        </div>
-      </div>
-
-      {/* Benchmark Experiment Runner Results */}
       {experimentResult && (
-        <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-5 shadow-lg space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-aerospace-800">
-            <div>
-              <h3 className="text-sm font-bold text-white font-mono flex items-center gap-2">
-                <Table className="w-4 h-4 text-cyan-400" />
-                SCENARIO BENCHMARK RESULTS ({experimentResult.experiment_id})
-              </h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Evaluated {experimentResult.total_evaluations} candidate routes in {experimentResult.total_duration_s}s
-              </p>
-            </div>
-            <span className="px-2.5 py-1 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 text-xs font-mono font-bold">
-              STATUS: {experimentResult.status.toUpperCase()}
-            </span>
-          </div>
-
-          <div className="overflow-x-auto max-h-96">
-            <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-aerospace-950 text-slate-400 sticky top-0 border-b border-aerospace-800">
-                <tr>
-                  <th className="py-2 px-3">Scenario</th>
-                  <th className="py-2 px-3">Pair</th>
-                  <th className="py-2 px-3">Objective</th>
-                  <th className="py-2 px-3">Distance</th>
-                  <th className="py-2 px-3">ETA</th>
-                  <th className="py-2 px-3">Weather</th>
-                  <th className="py-2 px-3">Congestion</th>
-                  <th className="py-2 px-3">Score</th>
-                  <th className="py-2 px-3">Latency</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-aerospace-800 text-slate-300">
-                {experimentResult.results?.map((row: any, i: number) => (
-                  <tr key={i} className="hover:bg-aerospace-850/50 transition">
-                    <td className="py-2 px-3 font-semibold text-white">{row.scenario_id}</td>
-                    <td className="py-2 px-3 text-slate-400">{row.origin} → {row.destination}</td>
-                    <td className="py-2 px-3 text-cyan-300 capitalize">{row.objective}</td>
-                    <td className="py-2 px-3">{row.route_distance_km ? `${row.route_distance_km} km` : 'N/A'}</td>
-                    <td className="py-2 px-3">{row.estimated_time_min ? `${row.estimated_time_min} min` : 'N/A'}</td>
-                    <td className="py-2 px-3 text-amber-400">{row.weather_penalty ?? 'N/A'}</td>
-                    <td className="py-2 px-3 text-rose-400">{row.congestion_penalty ?? 'N/A'}</td>
-                    <td className="py-2 px-3 font-bold text-white">{row.total_composite_score?.toFixed(4) ?? 'N/A'}</td>
-                    <td className="py-2 px-3 text-emerald-400">{row.replanning_latency_ms} ms</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <section className="surface-card">
+          <div className="surface-card-heading"><div><p className="eyebrow">ON-DEMAND ROUTING EXPERIMENT</p><h3>Benchmark result</h3></div><span className="status-tag tag-good">RESPONSE RECEIVED</span></div>
+          <pre className="experiment-json">{JSON.stringify(experimentResult, null, 2)}</pre>
+        </section>
       )}
     </div>
   );
 };
+
+const ShieldCheckIcon = () => <CheckCircle2 className="text-emerald-300" size={19} />;
+const FlaskConicalIcon = () => <Activity className="text-cyan-300" size={19} />;

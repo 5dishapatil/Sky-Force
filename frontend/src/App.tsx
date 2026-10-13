@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Header } from './components/Header';
+import React, { useEffect, useState } from 'react';
+import { Activity, AlertCircle, ArrowUpRight, Database, ShieldAlert } from 'lucide-react';
+import { Header, tabLabels } from './components/Header';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { OverviewView } from './views/OverviewView';
 import { AirspaceExplorerView } from './views/AirspaceExplorerView';
 import { RouteLabView } from './views/RouteLabView';
@@ -12,145 +14,183 @@ import { DocumentationView } from './views/DocumentationView';
 import { api } from './services/api';
 import type { Airport, AirspaceNetwork, Scenario, ModelsStatusResponse, CongestionCell } from './types';
 
-export function App() {
-  const [activeTab, setActiveTab] = useState<string>('overview');
-  const [systemStatus, setSystemStatus] = useState<{ status: string; database: string; activeScenario?: string | null }>({
-    status: 'ONLINE',
-    database: 'SQLite (WAL)',
-  });
+interface SystemStatus {
+  status: string;
+  database: string;
+  activeScenario?: string | null;
+}
 
+interface LoadResult<T> {
+  ok: boolean;
+  data?: T;
+  error?: string;
+}
+
+async function settle<T>(request: Promise<T>): Promise<LoadResult<T>> {
+  try {
+    return { ok: true, data: await request };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Request failed' };
+  }
+}
+
+export function App() {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [systemStatus, setSystemStatus] = useState<SystemStatus>({ status: 'CHECKING', database: 'Unknown' });
   const [airports, setAirports] = useState<Airport[]>([]);
   const [network, setNetwork] = useState<AirspaceNetwork | null>(null);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [modelsStatus, setModelsStatus] = useState<ModelsStatusResponse | null>(null);
   const [congestionCells, setCongestionCells] = useState<CongestionCell[]>([]);
-  const [aircraft, setAircraft] = useState<any[]>([]);
+  const [aircraft, setAircraft] = useState<Record<string, unknown>[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [loadWarning, setLoadWarning] = useState<string | null>(null);
 
-  // Initial Data Fetch
   useEffect(() => {
+    let cancelled = false;
+
     const initApp = async () => {
-      try {
-        const [healthRes, apRes, netRes, scRes, modRes, cgRes, acRes] = await Promise.all([
-          api.getHealth().catch(() => ({ status: 'ok', database: 'sqlite' })),
-          api.getAirports().catch(() => []),
-          api.getAirspaceNetwork().catch(() => null),
-          api.getScenarios().catch(() => []),
-          api.getModelsStatus().catch(() => null),
-          api.getCongestionCells().catch(() => []),
-          api.getAircraftObservations(150).catch(() => ({ observations: [] })),
-        ]);
+      const [health, airportResult, networkResult, scenarioResult, modelResult, cellResult, aircraftResult] = await Promise.all([
+        settle(api.getHealth()),
+        settle(api.getAirports()),
+        settle(api.getAirspaceNetwork()),
+        settle(api.getScenarios()),
+        settle(api.getModelsStatus()),
+        settle(api.getCongestionCells()),
+        settle(api.getAircraftObservations(150)),
+      ]);
 
-        const activeSc = scRes.find((s: Scenario) => s.is_active);
-        setSystemStatus({
-          status: healthRes.status || 'ONLINE',
-          database: healthRes.database || 'SQLite',
-          activeScenario: activeSc ? activeSc.name : null,
-        });
+      if (cancelled) return;
 
-        setAirports(apRes);
-        setNetwork(netRes);
-        setScenarios(scRes);
-        setModelsStatus(modRes);
-        setCongestionCells(cgRes);
-        setAircraft(acRes.observations || []);
-      } catch (err) {
-        console.error('Initial data load error:', err);
-      }
+      const healthData = health.data;
+      const airportData = Array.isArray(airportResult.data)
+        ? airportResult.data.filter((airport) => airport && typeof airport.node_id === 'string' && Number.isFinite(Number(airport.latitude)) && Number.isFinite(Number(airport.longitude))) as Airport[]
+        : [];
+      const networkPayload = networkResult.data;
+      const safeNetwork = networkPayload && Array.isArray(networkPayload.airports) && Array.isArray(networkPayload.waypoints) && Array.isArray(networkPayload.edges)
+        ? networkPayload
+        : null;
+      const scenarioData = Array.isArray(scenarioResult.data)
+        ? scenarioResult.data.filter((scenario) => scenario && typeof scenario.id === 'string' && typeof scenario.name === 'string')
+        : [];
+      const activeScenario = scenarioData.find((scenario) => scenario.is_active);
+      const failedParts = [
+        !health.ok && 'health check',
+        !airportResult.ok && 'airports',
+        !networkResult.ok && 'airspace network',
+        !scenarioResult.ok && 'scenarios',
+        !modelResult.ok && 'model status',
+        !cellResult.ok && 'congestion data',
+        !aircraftResult.ok && 'aircraft observations',
+      ].filter(Boolean);
+
+      setSystemStatus({
+        status: health.ok ? (healthData?.status || 'OK') : 'DEGRADED',
+        database: healthData?.database || 'Unknown',
+        activeScenario: activeScenario?.name ?? null,
+      });
+      setAirports(airportData);
+      setNetwork(safeNetwork);
+      setScenarios(scenarioData);
+      setModelsStatus(modelResult.data ?? null);
+      setCongestionCells(Array.isArray(cellResult.data) ? cellResult.data.filter((cell) => cell && typeof cell.cell_id === 'string') : []);
+      const observations = aircraftResult.data && typeof aircraftResult.data === 'object'
+        ? (aircraftResult.data as { observations?: Record<string, unknown>[] }).observations
+        : [];
+      setAircraft(Array.isArray(observations) ? observations : []);
+      setLoadWarning(failedParts.length ? `Some data could not be loaded: ${failedParts.join(', ')}. Check the backend/API status.` : null);
+      setInitialLoading(false);
     };
 
-    initApp();
+    void initApp();
+    return () => { cancelled = true; };
   }, []);
 
   const refreshScenarios = async () => {
     try {
-      const scRes = await api.getScenarios();
-      setScenarios(scRes);
-      const activeSc = scRes.find((s: Scenario) => s.is_active);
-      setSystemStatus((prev) => ({
-        ...prev,
-        activeScenario: activeSc ? activeSc.name : null,
-      }));
-    } catch (e) {
-      console.error(e);
+      const result = await api.getScenarios();
+      const safeScenarios = Array.isArray(result)
+        ? result.filter((scenario) => scenario && typeof scenario.id === 'string' && typeof scenario.name === 'string')
+        : [];
+      setScenarios(safeScenarios);
+      const activeScenario = safeScenarios.find((scenario) => scenario.is_active);
+      setSystemStatus((previous) => ({ ...previous, activeScenario: activeScenario?.name ?? null }));
+    } catch (error) {
+      console.error('Could not refresh scenarios:', error);
+      setLoadWarning(error instanceof Error ? `Scenario refresh failed: ${error.message}` : 'Scenario refresh failed.');
     }
   };
 
+  const activeTitle = tabLabels[activeTab] || 'Mission Control';
+  const isHealthy = ['ok', 'online', 'healthy', 'operational'].includes((systemStatus.status || '').toLowerCase());
+
   return (
-    <div className="min-h-screen bg-aerospace-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-aerospace-950">
-      {/* Top Navbar & Operational Disclaimer */}
-      <Header
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        systemStatus={systemStatus}
-      />
+    <div className="app-shell">
+      <Header activeTab={activeTab} setActiveTab={setActiveTab} systemStatus={systemStatus} />
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {activeTab === 'overview' && (
-          <OverviewView
-            network={network}
-            modelsStatus={modelsStatus}
-            onNavigate={(tab) => setActiveTab(tab)}
-          />
+      <div className="app-main-column">
+        <header className="app-topbar">
+          <div className="topbar-context">
+            <p className="eyebrow">SKY FORCE <span className="breadcrumb-slash">/</span> RESEARCH WORKSPACE</p>
+            <h1>{activeTitle}</h1>
+          </div>
+          <div className="topbar-meta">
+            <div className={`connection-pill ${isHealthy ? 'is-good' : systemStatus.status === 'CHECKING' ? 'is-pending' : 'is-warning'}`}>
+              <span className="status-indicator" />
+              <span>{isHealthy ? 'API connected' : systemStatus.status === 'CHECKING' ? 'Checking API' : 'API degraded'}</span>
+            </div>
+            <div className="data-mode-pill"><Database size={14} /> {systemStatus.database || 'DB unknown'}</div>
+          </div>
+        </header>
+
+        <div className="prototype-banner">
+          <ShieldAlert size={16} />
+          <span><strong>Research prototype.</strong> Simulation and decision support only—not approved for operational flight planning, navigation, or air traffic control.</span>
+          <span className="prototype-banner-mode">DATA PROVENANCE LABELLED</span>
+        </div>
+
+        {loadWarning && (
+          <div className="app-load-warning" role="status">
+            <AlertCircle size={16} />
+            <span>{loadWarning}</span>
+            <a href="http://127.0.0.1:8000/docs" target="_blank" rel="noreferrer">Open API docs <ArrowUpRight size={13} /></a>
+          </div>
         )}
 
-        {activeTab === 'explorer' && (
-          <AirspaceExplorerView
-            network={network}
-            airports={airports}
-            congestionCells={congestionCells}
-            aircraft={aircraft}
-          />
-        )}
+        <main className="app-content">
+          {initialLoading && (
+            <div className="loading-strip"><span className="loading-spinner" /> Loading airspace data and model status…</div>
+          )}
 
-        {activeTab === 'routing' && (
-          <RouteLabView
-            network={network}
-            airports={airports}
-          />
-        )}
+          <div className="view-transition" key={activeTab}>
+            <ErrorBoundary key={activeTab}>
+            {activeTab === 'overview' && (
+              <OverviewView
+                network={network}
+                airports={airports}
+                modelsStatus={modelsStatus}
+                congestionCells={congestionCells}
+                aircraft={aircraft}
+                onNavigate={setActiveTab}
+              />
+            )}
+            {activeTab === 'explorer' && <AirspaceExplorerView network={network} airports={airports} congestionCells={congestionCells} aircraft={aircraft} />}
+            {activeTab === 'routing' && <RouteLabView network={network} airports={airports} />}
+            {activeTab === 'scenarios' && <ScenarioStudioView scenarios={scenarios} onScenarioChange={refreshScenarios} airports={airports} network={network} />}
+            {activeTab === 'congestion' && <CongestionIntelligenceView modelsStatus={modelsStatus} />}
+            {activeTab === 'conflicts' && <ConflictLabView />}
+            {activeTab === 'evaluation' && <ModelEvaluationView modelsStatus={modelsStatus} />}
+            {activeTab === 'quality' && <DataQualityView />}
+            {activeTab === 'docs' && <DocumentationView />}
+            </ErrorBoundary>
+          </div>
+        </main>
 
-        {activeTab === 'scenarios' && (
-          <ScenarioStudioView
-            scenarios={scenarios}
-            onScenarioChange={refreshScenarios}
-            airports={airports}
-            network={network}
-          />
-        )}
-
-        {activeTab === 'congestion' && (
-          <CongestionIntelligenceView
-            modelsStatus={modelsStatus}
-          />
-        )}
-
-        {activeTab === 'conflicts' && (
-          <ConflictLabView />
-        )}
-
-        {activeTab === 'evaluation' && (
-          <ModelEvaluationView />
-        )}
-
-        {activeTab === 'quality' && (
-          <DataQualityView />
-        )}
-
-        {activeTab === 'docs' && (
-          <DocumentationView />
-        )}
-      </main>
-
-      {/* Bottom Footer with Persistent Disclaimer */}
-      <footer className="bg-aerospace-950 border-t border-aerospace-800/80 py-4 px-4 text-center text-xs text-slate-500 space-y-1">
-        <p className="font-mono text-slate-400">
-          Sky Force: AI-Driven Framework for Predictive Airspace Analysis, Explainable Route Optimisation & Dynamic Rerouting
-        </p>
-        <p className="text-[11px] text-amber-300/70 font-mono">
-          Research prototype for simulation and decision support. Not approved for operational flight planning, navigation, or air traffic control.
-        </p>
-      </footer>
+        <footer className="app-footer">
+          <span><Activity size={13} /> Sky Force · AI-driven airspace analysis</span>
+          <span>Academic prototype · Not for operational use</span>
+        </footer>
+      </div>
     </div>
   );
 }
