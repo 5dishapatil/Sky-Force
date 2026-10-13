@@ -16,7 +16,7 @@ samples - adequate for the regional demo; documented limitation.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from shapely.geometry import LineString, Polygon
@@ -61,8 +61,23 @@ def validate_event(ev: dict[str, Any], rg: RouteGraph) -> None:
         raise ValidationFailed("traffic_surge requires scope.edge_ids or scope.cell_ids")
 
 
+def _normalize_dt(d: datetime | str) -> datetime:
+    if isinstance(d, str):
+        d = datetime.fromisoformat(d.replace("Z", "+00:00"))
+    if d.tzinfo is not None:
+        return d.astimezone(timezone.utc).replace(tzinfo=None)
+    return d
+
+
 def is_active(ev: dict[str, Any], t: datetime) -> bool:
-    return bool(ev.get("enabled", True)) and ev["start_time_utc"] <= t < ev["end_time_utc"]
+    if not bool(ev.get("enabled", True)):
+        return False
+    t_norm = _normalize_dt(t)
+    start_val = ev.get("start_time_utc")
+    end_val = ev.get("end_time_utc")
+    t_start = _normalize_dt(start_val) if start_val is not None else datetime.min
+    t_end = _normalize_dt(end_val) if end_val is not None else datetime.max
+    return t_start <= t_norm < t_end
 
 
 def _edges_in_polygon(rg: RouteGraph, polygon: list[list[float]]) -> list[tuple[str, str]]:

@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: skyforce-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - SKYFORCE_ENVIRONMENT=production
+      - SKYFORCE_DATABASE_URL=sqlite:////app/data/skyforce.db
+      - SKYFORCE_LOG_LEVEL=INFO
+    volumes:
+      - ./data:/app/data
+      - ./ml:/app/ml
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: skyforce-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
