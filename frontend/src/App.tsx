@@ -7,10 +7,11 @@ import { AirspaceExplorerView } from './views/AirspaceExplorerView';
 import { RouteLabView } from './views/RouteLabView';
 import { ScenarioStudioView } from './views/ScenarioStudioView';
 import { CongestionIntelligenceView } from './views/CongestionIntelligenceView';
-import { ConflictLabView } from './views/ConflictLabView';
 import { ModelEvaluationView } from './views/ModelEvaluationView';
 import { DataQualityView } from './views/DataQualityView';
 import { DocumentationView } from './views/DocumentationView';
+import { DatasetStudioView } from './views/DatasetStudioView';
+import { DatasetExplorerView } from './views/DatasetExplorerView';
 import { api } from './services/api';
 import type { Airport, AirspaceNetwork, Scenario, ModelsStatusResponse, CongestionCell } from './types';
 
@@ -36,6 +37,7 @@ async function settle<T>(request: Promise<T>): Promise<LoadResult<T>> {
 
 export function App() {
   const [activeTab, setActiveTab] = useState('overview');
+  const [activeDatasetId, setActiveDatasetId] = useState<string>('synthetic_demo_v1');
   const [systemStatus, setSystemStatus] = useState<SystemStatus>({ status: 'CHECKING', database: 'Unknown' });
   const [airports, setAirports] = useState<Airport[]>([]);
   const [network, setNetwork] = useState<AirspaceNetwork | null>(null);
@@ -139,15 +141,12 @@ export function App() {
               <span className="status-indicator" />
               <span>{isHealthy ? 'API connected' : systemStatus.status === 'CHECKING' ? 'Checking API' : 'API degraded'}</span>
             </div>
+            <div className="data-mode-pill font-mono text-xs" title="Currently selected dataset context for analysis and routing">
+              <span className="text-cyan-400 font-bold">DATASET:</span> {activeDatasetId}
+            </div>
             <div className="data-mode-pill"><Database size={14} /> {systemStatus.database || 'DB unknown'}</div>
           </div>
         </header>
-
-        <div className="prototype-banner">
-          <ShieldAlert size={16} />
-          <span><strong>Research prototype.</strong> Simulation and decision support only—not approved for operational flight planning, navigation, or air traffic control.</span>
-          <span className="prototype-banner-mode">DATA PROVENANCE LABELLED</span>
-        </div>
 
         {loadWarning && (
           <div className="app-load-warning" role="status">
@@ -174,11 +173,29 @@ export function App() {
                 onNavigate={setActiveTab}
               />
             )}
+            {activeTab === 'studio' && (
+              <DatasetStudioView
+                activeDatasetId={activeDatasetId}
+                onSelectActiveDataset={setActiveDatasetId}
+                onNavigate={setActiveTab}
+              />
+            )}
+            {activeTab === 'dataset-explorer' && (
+              <DatasetExplorerView
+                activeDatasetId={activeDatasetId}
+              />
+            )}
             {activeTab === 'explorer' && <AirspaceExplorerView network={network} airports={airports} congestionCells={congestionCells} aircraft={aircraft} />}
-            {activeTab === 'routing' && <RouteLabView network={network} airports={airports} />}
+            {activeTab === 'routing' && (
+              <RouteLabView
+                network={network}
+                airports={airports}
+                activeDatasetId={activeDatasetId}
+                onSelectDataset={setActiveDatasetId}
+              />
+            )}
             {activeTab === 'scenarios' && <ScenarioStudioView scenarios={scenarios} onScenarioChange={refreshScenarios} airports={airports} network={network} />}
             {activeTab === 'congestion' && <CongestionIntelligenceView modelsStatus={modelsStatus} />}
-            {activeTab === 'conflicts' && <ConflictLabView />}
             {activeTab === 'evaluation' && <ModelEvaluationView modelsStatus={modelsStatus} />}
             {activeTab === 'quality' && <DataQualityView />}
             {activeTab === 'docs' && <DocumentationView />}

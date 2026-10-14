@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Polyline, Polygon, Tooltip, Popup } from 'react-leaflet';
-import type { Airport, Waypoint, RouteEdge, RouteDetail, CongestionCell } from '../types';
-import { Eye, Layers } from 'lucide-react';
+import type { Airport, Waypoint, RouteEdge, RouteDetail, CongestionCell, RouteSegment } from '../types';
+import { Eye, Layers, CloudRain } from 'lucide-react';
 
 interface AirspaceMapProps {
   airports?: Airport[];
@@ -10,11 +10,14 @@ interface AirspaceMapProps {
   primaryRoute?: RouteDetail | null;
   secondaryRoute?: RouteDetail | null;
   congestionCells?: CongestionCell[];
+  weatherCells?: any[];
+  selectedSegmentId?: string | null;
   aircraft?: any[];
   center?: [number, number];
   zoom?: number;
   height?: string;
   onAirportClick?: (airport: Airport) => void;
+  onSelectSegment?: (segment: RouteSegment | null) => void;
 }
 
 export const AirspaceMap: React.FC<AirspaceMapProps> = ({
@@ -24,17 +27,21 @@ export const AirspaceMap: React.FC<AirspaceMapProps> = ({
   primaryRoute = null,
   secondaryRoute = null,
   congestionCells = [],
+  weatherCells = [],
+  selectedSegmentId = null,
   aircraft = [],
   center = [21.5, 78.0], // Center over India
   zoom = 5,
   height = '580px',
   onAirportClick,
+  onSelectSegment,
 }) => {
   // Layer visibility toggles
   const [showAirports, setShowAirports] = useState(true);
   const [showWaypoints, setShowWaypoints] = useState(true);
   const [showAirways, setShowAirways] = useState(true);
   const [showCongestion, setShowCongestion] = useState(false);
+  const [showWeather, setShowWeather] = useState(true);
   const [showAircraft, setShowAircraft] = useState(true);
 
   // Route edges may connect airports to intermediate waypoints, not only airport nodes.
@@ -43,6 +50,7 @@ export const AirspaceMap: React.FC<AirspaceMapProps> = ({
   waypoints.forEach((waypoint) => nodeCoordinates.set(waypoint.node_id, waypoint));
 
   const formatMapNumber = (value: unknown, decimals = 2): string => {
+
     const numeric = typeof value === 'number' ? value : Number(value);
     return Number.isFinite(numeric) ? numeric.toFixed(decimals) : '—';
   };
@@ -103,6 +111,17 @@ export const AirspaceMap: React.FC<AirspaceMapProps> = ({
         <label className="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
           <input
             type="checkbox"
+            checked={showWeather}
+            onChange={(e) => setShowWeather(e.target.checked)}
+            className="rounded bg-aerospace-950 border-aerospace-700 text-amber-500 focus:ring-0"
+          />
+          <span className="flex items-center gap-1">
+            <CloudRain className="w-3 h-3 text-amber-400" /> Weather Hazards
+          </span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+          <input
+            type="checkbox"
             checked={showCongestion}
             onChange={(e) => setShowCongestion(e.target.checked)}
             className="rounded bg-aerospace-950 border-aerospace-700 text-cyan-500 focus:ring-0"
@@ -126,15 +145,52 @@ export const AirspaceMap: React.FC<AirspaceMapProps> = ({
         style={{ height, width: '100%' }}
         scrollWheelZoom={true}
       >
-        {/* OpenStreetMap basemap: no API key required. The CSS class gives the
-            standard raster tiles a subdued dark appearance to fit Sky Force. */}
+        {/* OpenStreetMap basemap: standard raster tiles styled for dark mode */}
         <TileLayer
           className="skyforce-dark-osm"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {/* 1. Congestion Grid Cells */}
+        {/* 1. Convective Weather Hazards Overlay */}
+        {showWeather &&
+          weatherCells.map((wx, i) => {
+            const lat = Number(wx.latitude);
+            const lon = Number(wx.longitude);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+            const precip = wx.precipitation_mm || 0;
+            const gusts = wx.wind_gusts_10m_ms || 0;
+            const sev = precip > 5 || gusts > 20 ? 'HIGH' : precip > 1 || gusts > 12 ? 'MEDIUM' : 'LOW';
+            if (sev === 'LOW' && precip === 0) return null; // Only show active weather
+
+            const color = sev === 'HIGH' ? '#ef4444' : '#f59e0b';
+            return (
+              <CircleMarker
+                key={`wx-${wx.location_id || i}`}
+                center={[lat, lon]}
+                radius={sev === 'HIGH' ? 22 : 14}
+                pathOptions={{
+                  color,
+                  fillColor: color,
+                  fillOpacity: 0.35,
+                  weight: 1.5,
+                  dashArray: '3, 3',
+                }}
+              >
+                <Tooltip sticky>
+                  <div className="font-mono text-xs">
+                    <strong className="text-amber-300">Convective Storm Cell</strong>
+                    <div>Location: {wx.location_id}</div>
+                    <div>Precipitation: {precip.toFixed(1)} mm/h</div>
+                    <div>Wind Gusts: {gusts.toFixed(1)} m/s</div>
+                    <div>Severity Rating: {sev}</div>
+                  </div>
+                </Tooltip>
+              </CircleMarker>
+            );
+          })}
+
+        {/* 2. Congestion Grid Cells */}
         {showCongestion &&
           congestionCells.map((c) => {
             if (!Array.isArray(c.bounds) || c.bounds.length !== 2 || !Array.isArray(c.bounds[0]) || !Array.isArray(c.bounds[1])) return null;
@@ -170,7 +226,7 @@ export const AirspaceMap: React.FC<AirspaceMapProps> = ({
             );
           })}
 
-        {/* 2. Candidate Airway Edges */}
+        {/* 3. Candidate Airway Edges */}
         {showAirways &&
           edges.map((e) => {
             const u = nodeCoordinates.get(e.source_node);
@@ -184,9 +240,9 @@ export const AirspaceMap: React.FC<AirspaceMapProps> = ({
                   [v.latitude, v.longitude],
                 ]}
                 pathOptions={{
-                  color: '#64748b',
+                  color: '#475569',
                   weight: 1.2,
-                  opacity: 0.82,
+                  opacity: 0.7,
                 }}
               >
                 <Tooltip sticky>
@@ -198,7 +254,7 @@ export const AirspaceMap: React.FC<AirspaceMapProps> = ({
             );
           })}
 
-        {/* 3. Secondary Route (e.g. Baseline unperturbed or alternative) */}
+        {/* 4. Secondary Route (Baseline) */}
         {secondaryGeometry.length > 1 && secondaryRoute && (
           <Polyline
             positions={secondaryGeometry}
@@ -219,26 +275,63 @@ export const AirspaceMap: React.FC<AirspaceMapProps> = ({
           </Polyline>
         )}
 
-        {/* 4. Primary Route (Active / Rerouted / Selected) */}
-        {primaryGeometry.length > 1 && primaryRoute && (
-          <Polyline
-            positions={primaryGeometry}
-            pathOptions={{
-              color: '#00f0ff',
-              weight: 4.5,
-              opacity: 0.95,
-            }}
-          >
-            <Tooltip sticky>
-              <div className="font-mono text-xs">
-                <strong>{primaryRoute.label || 'Active Route'}</strong>
-                <div>Distance: {primaryRoute.totals?.distance_km} km</div>
-                <div>ETA: {primaryRoute.totals?.estimated_time_min} min</div>
-                <div>Hops: {primaryRoute.totals?.hops}</div>
-              </div>
-            </Tooltip>
-          </Polyline>
+        {/* 5. Primary Route Interactive Segments (with click & highlight) */}
+        {primaryRoute?.segments && primaryRoute.segments.length > 0 ? (
+          primaryRoute.segments.map((seg) => {
+            const u = nodeCoordinates.get(seg.from_node);
+            const v = nodeCoordinates.get(seg.to_node);
+            if (!u || !v) return null;
+            const isSelected = seg.edge_id === selectedSegmentId;
+
+            return (
+              <Polyline
+                key={`seg-${seg.edge_id}`}
+                positions={[
+                  [u.latitude, u.longitude],
+                  [v.latitude, v.longitude],
+                ]}
+                pathOptions={{
+                  color: isSelected ? '#ffffff' : '#00f0ff',
+                  weight: isSelected ? 7 : 4.5,
+                  opacity: isSelected ? 1.0 : 0.95,
+                }}
+                eventHandlers={{
+                  click: () => onSelectSegment?.(seg),
+                }}
+              >
+                <Tooltip sticky>
+                  <div className="font-mono text-xs">
+                    <strong>{seg.from_node} → {seg.to_node} ({seg.distance_km.toFixed(0)} km)</strong>
+                    <div>ETA: {seg.time_min.toFixed(1)} min</div>
+                    <div>Weather: {seg.weather_severity !== null ? `${(seg.weather_severity * 100).toFixed(0)}%` : 'None'}</div>
+                    <div>Traffic: {seg.congestion_score !== null ? `${(seg.congestion_score * 100).toFixed(0)}%` : 'None'}</div>
+                    <div className="text-[10px] text-cyan-300 mt-1">Click to inspect segment details</div>
+                  </div>
+                </Tooltip>
+              </Polyline>
+            );
+          })
+        ) : (
+          primaryGeometry.length > 1 && primaryRoute && (
+            <Polyline
+              positions={primaryGeometry}
+              pathOptions={{
+                color: '#00f0ff',
+                weight: 4.5,
+                opacity: 0.95,
+              }}
+            >
+              <Tooltip sticky>
+                <div className="font-mono text-xs">
+                  <strong>{primaryRoute.label || 'Active Route'}</strong>
+                  <div>Distance: {primaryRoute.totals?.distance_km} km</div>
+                  <div>ETA: {primaryRoute.totals?.estimated_time_min} min</div>
+                </div>
+              </Tooltip>
+            </Polyline>
+          )
         )}
+
 
         {/* 5. Intermediate airway waypoints */}
         {showWaypoints && waypoints.filter((waypoint) => Number.isFinite(waypoint.latitude) && Number.isFinite(waypoint.longitude)).map((waypoint) => (

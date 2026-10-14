@@ -29,8 +29,8 @@ EPS = 1e-3
 OBJECTIVE_PRESETS: dict[str, dict[str, float]] = {
     "distance": {"distance": 1.0, "time": 0, "weather": 0, "congestion": 0, "uncertainty": 0},
     "fastest": {"distance": 0, "time": 1.0, "weather": 0, "congestion": 0, "uncertainty": 0},
-    "weather": {"distance": 0.5, "time": 0, "weather": 0.5, "congestion": 0, "uncertainty": 0},
-    "congestion": {"distance": 0.5, "time": 0, "weather": 0, "congestion": 0.5, "uncertainty": 0},
+    "weather": {"distance": 0.45, "time": 0, "weather": 0.45, "congestion": 0, "uncertainty": 0.10},
+    "congestion": {"distance": 0.45, "time": 0, "weather": 0, "congestion": 0.45, "uncertainty": 0.10},
     "balanced": {"distance": 0.25, "time": 0.25, "weather": 0.2, "congestion": 0.2, "uncertainty": 0.1},
 }
 
@@ -75,13 +75,21 @@ class CostModel:
 
     def components(self, a: EdgeAttrs) -> dict[str, float]:
         L = a.distance_km / self.ref_km
+        # Robust missing-data handling:
+        # Unobserved weather/congestion is NEVER treated as zero risk (which would make
+        # unobserved routes appear artificially optimal). An unobserved observation incurs
+        # a conservative missing penalty (0.50 proxy) and elevated uncertainty.
+        weather_val = a.weather_severity if a.weather_severity is not None else 0.50
+        congestion_val = a.congestion_score if a.congestion_score is not None else 0.50
+
         return {
             "distance": L,
             "time": a.time_min / self.ref_min,
-            "weather": (a.weather_severity or 0.0) * L,
-            "congestion": (a.congestion_score or 0.0) * L,
+            "weather": weather_val * L,
+            "congestion": congestion_val * L,
             "uncertainty": a.uncertainty * L,
         }
+
 
     def weighted(self, comps: dict[str, float], w: CostWeights) -> dict[str, float]:
         return {k: getattr(w, k) * comps[k] for k in FACTORS}

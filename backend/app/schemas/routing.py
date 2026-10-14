@@ -22,6 +22,8 @@ class OptimizeRouteRequest(BaseModel):
     weights: RouteWeightsInput | None = None
     scenario_id: str | None = None
     departure_time_utc: datetime | None = None
+    dataset_id: str | None = None
+    run_id: str | None = None
 
 
 class SegmentDetail(BaseModel):
@@ -62,6 +64,8 @@ class RouteDetailResponse(BaseModel):
     label: str
     algorithm: str
     route_id: str | None = None
+    dataset_id: str | None = "synthetic_demo_v1"
+    run_id: str | None = None
     path: list[str] = Field(default_factory=list)
     geometry: list[list[float]] = Field(default_factory=list)
     totals: RouteTotals | None = None
@@ -78,6 +82,8 @@ class CompareRoutesResponse(BaseModel):
     origin: str
     destination: str
     scenario_id: str | None = None
+    dataset_id: str | None = "synthetic_demo_v1"
+    run_id: str | None = None
     selected_objective: str
     algorithm: str
     routes: list[RouteDetailResponse]
@@ -91,4 +97,7 @@ class ExplainRouteRequest(BaseModel):
     objective: str = "balanced"
     algorithm: str = "dijkstra"
     scenario_id: str | None = None
+    dataset_id: str | None = None
+    run_id: str | None = None
     weights: RouteWeightsInput | None = None
+

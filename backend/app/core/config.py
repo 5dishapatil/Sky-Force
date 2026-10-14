@@ -80,8 +80,13 @@ class Settings(BaseSettings):
     aviation_weather_base_url: str = "https://aviationweather.gov/api/data"
     ourairports_csv_url: str = "https://davidmegginson.github.io/ourairports-data/airports.csv"
 
-    # Optional upload limit for observation file import (bytes)
+    # Upload limit for observation file import (configurable via SKYFORCE_MAX_UPLOAD_BYTES)
     max_upload_bytes: int = 25 * 1024 * 1024
+
+    # LLM Explanation Service (configurable via SKYFORCE_OLLAMA_BASE_URL, etc.)
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "phi3:latest"
+    ollama_timeout_s: float = 4.0
 
     @property
     def artifacts_dir(self) -> Path:

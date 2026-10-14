@@ -17,6 +17,7 @@ from app.schemas.routing import (
     RouteDetailResponse,
 )
 from app.services.routing.cost_model import CostWeights
+from app.services.datasets.manager import get_dataset_context_builder
 from app.services.routing.explain import explain_route
 from app.services.routing.planner import OBJECTIVE_NAMES, closed_edges_on_unconstrained
 from app.services.scenario_engine.events import apply_events
@@ -24,11 +25,21 @@ from app.services.scenario_engine.events import apply_events
 router = APIRouter(prefix="/routes", tags=["Route Optimization"])
 
 
-def _resolve_context(state, departure_time: datetime | None, scenario_id: str | None, db: Session):  # noqa: ANN001
+def _resolve_context(
+    state,
+    departure_time: datetime | None,
+    scenario_id: str | None,
+    db: Session,
+    dataset_id: str | None = None,
+):  # noqa: ANN001
     t = departure_time or state.settings.default_scenario_time_utc
     if t.tzinfo is None:
         t = t.replace(tzinfo=timezone.utc)
-    base_ctx = state.context_builder.base_context(t)
+
+    # Thread-safe dataset-specific context resolution:
+    # Does NOT mutate shared global state.
+    builder = get_dataset_context_builder(dataset_id, state.context_builder)
+    base_ctx = builder.base_context(t)
 
     if not scenario_id:
         return base_ctx
@@ -57,7 +68,8 @@ def _resolve_context(state, departure_time: datetime | None, scenario_id: str | 
 @router.post("/optimize", response_model=RouteDetailResponse)
 def optimize_route(req: OptimizeRouteRequest, db: Session = Depends(get_db)) -> RouteDetailResponse:
     state = get_state()
-    ctx = _resolve_context(state, req.departure_time_utc, req.scenario_id, db)
+    ctx = _resolve_context(state, req.departure_time_utc, req.scenario_id, db, dataset_id=req.dataset_id)
+
 
     # Cost weights
     if req.weights:
@@ -101,6 +113,8 @@ def optimize_route(req: OptimizeRouteRequest, db: Session = Depends(get_db)) -> 
         label=req.objective,
         algorithm=req.algorithm,
         route_id=res["route_id"],
+        dataset_id=req.dataset_id or "synthetic_demo_v1",
+        run_id=req.run_id,
         path=res["path"],
         geometry=res["geometry"],
         totals=res["totals"],
@@ -115,7 +129,7 @@ def optimize_route(req: OptimizeRouteRequest, db: Session = Depends(get_db)) -> 
 @router.post("/compare", response_model=CompareRoutesResponse)
 def compare_routes(req: OptimizeRouteRequest, db: Session = Depends(get_db)) -> CompareRoutesResponse:
     state = get_state()
-    ctx = _resolve_context(state, req.departure_time_utc, req.scenario_id, db)
+    ctx = _resolve_context(state, req.departure_time_utc, req.scenario_id, db, dataset_id=req.dataset_id)
 
     if req.weights:
         selected_w = CostWeights.from_dict(req.weights.model_dump())
@@ -154,6 +168,8 @@ def compare_routes(req: OptimizeRouteRequest, db: Session = Depends(get_db)) -> 
             label=", ".join(a.get("labels", [req.objective])),
             algorithm=req.algorithm,
             route_id=a["route_id"],
+            dataset_id=req.dataset_id or "synthetic_demo_v1",
+            run_id=req.run_id,
             path=a["path"],
             geometry=a["geometry"],
             totals=a["totals"],
@@ -176,6 +192,8 @@ def compare_routes(req: OptimizeRouteRequest, db: Session = Depends(get_db)) -> 
         origin=req.origin,
         destination=req.destination,
         scenario_id=req.scenario_id,
+        dataset_id=req.dataset_id or "synthetic_demo_v1",
+        run_id=req.run_id,
         selected_objective=req.objective,
         algorithm=req.algorithm,
         routes=route_details,
@@ -189,18 +207,19 @@ def get_pareto_routes(
     origin: str = Query(..., description="Origin node e.g. VIDP"),
     destination: str = Query(..., description="Destination node e.g. VABB"),
     scenario_id: str | None = Query(None),
+    dataset_id: str | None = Query(None),
     algorithm: str = Query("dijkstra"),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     state = get_state()
-    ctx = _resolve_context(state, None, scenario_id, db)
+    ctx = _resolve_context(state, None, scenario_id, db, dataset_id=dataset_id)
     return state.planner.pareto(origin, destination, ctx, algorithm=algorithm)
 
 
 @router.post("/explain")
 def explain_candidate_route(req: ExplainRouteRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
     state = get_state()
-    ctx = _resolve_context(state, None, req.scenario_id, db)
+    ctx = _resolve_context(state, None, req.scenario_id, db, dataset_id=req.dataset_id)
     w = CostWeights.from_dict(req.weights.model_dump()) if req.weights else CostWeights.preset(req.objective if req.objective in ["distance", "fastest", "weather", "congestion", "balanced"] else "balanced")
 
     res = state.planner.plan(req.origin, req.destination, w, ctx, req.algorithm, label=req.objective)
@@ -209,4 +228,5 @@ def explain_candidate_route(req: ExplainRouteRequest, db: Session = Depends(get_
     closed = closed_edges_on_unconstrained(state.planner, req.origin, req.destination, ctx, w, req.algorithm)
 
     expl = explain_route(res, res_base if res_base.get("found") else None, ctx, OBJECTIVE_NAMES.get(req.objective, req.objective), closed)
-    return {"route_id": res.get("route_id"), "explanation": expl}
+    return {"route_id": res.get("route_id"), "explanation": expl, "dataset_id": req.dataset_id or "synthetic_demo_v1"}
+

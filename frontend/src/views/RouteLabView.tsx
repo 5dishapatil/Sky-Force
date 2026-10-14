@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Compass, 
   Play, 
@@ -10,24 +10,51 @@ import {
   Navigation,
   CloudLightning,
   Activity,
-  Layers
+  Layers,
+  Database,
+  ShieldAlert,
+  ArrowRight
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import type { Airport, RouteDetail, CompareRoutesResponse, AirspaceNetwork } from '../types';
+import type { Airport, RouteDetail, CompareRoutesResponse, AirspaceNetwork, RouteSegment, DatasetSummaryItem } from '../types';
 import { api } from '../services/api';
 import { AirspaceMap } from '../components/AirspaceMap';
+import { Airspace3DMap } from '../components/Airspace3DMap';
+import { RouteProfileChart } from '../components/RouteProfileChart';
+import { SegmentInspector } from '../components/SegmentInspector';
+import { ExplanationPanel } from '../components/ExplanationPanel';
 
 interface RouteLabViewProps {
   network: AirspaceNetwork | null;
   airports: Airport[];
+  congestionCells?: any[];
+  activeDatasetId?: string;
+  onSelectDataset?: (id: string) => void;
 }
 
-export const RouteLabView: React.FC<RouteLabViewProps> = ({ network, airports }) => {
+export const RouteLabView: React.FC<RouteLabViewProps> = ({
+  network,
+  airports,
+  congestionCells = [],
+  activeDatasetId = 'synthetic_demo_v1',
+  onSelectDataset,
+}) => {
+  const [mapMode, setMapMode] = useState<'2d' | '3d'>('3d');
   const [origin, setOrigin] = useState<string>('VIDP');
   const [destination, setDestination] = useState<string>('VABB');
   const [algorithm, setAlgorithm] = useState<'dijkstra' | 'astar'>('dijkstra');
   const [objective, setObjective] = useState<string>('balanced');
   
+  // Available datasets
+  const [availableDatasets, setAvailableDatasets] = useState<DatasetSummaryItem[]>([]);
+  const [selectedDatasetId, setSelectedDatasetId] = useState<string>(activeDatasetId);
+
+  // Weather data
+  const [weatherData, setWeatherData] = useState<any[]>([]);
+
+  // Selected route segment for bidirectional inspector
+  const [selectedSegment, setSelectedSegment] = useState<RouteSegment | null>(null);
+
   // Custom Weights
   const [weights, setWeights] = useState({
     distance: 0.25,
@@ -42,6 +69,30 @@ export const RouteLabView: React.FC<RouteLabViewProps> = ({ network, airports })
   const [routeResult, setRouteResult] = useState<RouteDetail | null>(null);
   const [compareResult, setCompareResult] = useState<CompareRoutesResponse | null>(null);
 
+  useEffect(() => {
+    setSelectedDatasetId(activeDatasetId);
+  }, [activeDatasetId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchAuxiliary = async () => {
+      try {
+        const [dsList, wxRes] = await Promise.all([
+          api.getDatasets().catch(() => []),
+          api.getWeather().catch(() => []),
+        ]);
+        if (cancelled) return;
+        setAvailableDatasets(Array.isArray(dsList) ? dsList : []);
+        const wxCells = Array.isArray(wxRes) ? wxRes : (wxRes?.weather_cells || wxRes?.cells || []);
+        setWeatherData(wxCells);
+      } catch (e) {
+        console.warn('Could not fetch aux routing data:', e);
+      }
+    };
+    fetchAuxiliary();
+    return () => { cancelled = true; };
+  }, []);
+
   const presets: Record<string, { label: string; desc: string; w: typeof weights }> = {
     distance: {
       label: 'Shortest Distance',
@@ -55,13 +106,13 @@ export const RouteLabView: React.FC<RouteLabViewProps> = ({ network, airports })
     },
     weather: {
       label: 'Weather Avoidance',
-      desc: 'Penalizes storm cells & convective weather',
-      w: { distance: 0.5, time: 0, weather: 0.5, congestion: 0, uncertainty: 0 },
+      desc: 'Penalizes storm cells & missing-data uncertainty',
+      w: { distance: 0.45, time: 0, weather: 0.45, congestion: 0, uncertainty: 0.10 },
     },
     congestion: {
       label: 'Congestion Avoidance',
-      desc: 'Penalizes high traffic density cells',
-      w: { distance: 0.5, time: 0, weather: 0, congestion: 0.5, uncertainty: 0 },
+      desc: 'Penalizes high traffic density & missing congestion',
+      w: { distance: 0.45, time: 0, weather: 0, congestion: 0.45, uncertainty: 0.10 },
     },
     balanced: {
       label: 'Composite Balanced',
@@ -77,6 +128,11 @@ export const RouteLabView: React.FC<RouteLabViewProps> = ({ network, airports })
     }
   };
 
+  const handleDatasetChange = (newDsId: string) => {
+    setSelectedDatasetId(newDsId);
+    onSelectDataset?.(newDsId);
+  };
+
   const handlePlanRoute = async () => {
     if (origin === destination) {
       setError('Origin and destination must differ.');
@@ -84,12 +140,14 @@ export const RouteLabView: React.FC<RouteLabViewProps> = ({ network, airports })
     }
     setLoading(true);
     setError(null);
+    setSelectedSegment(null);
     try {
       const res = await api.optimizeRoute({
         origin,
         destination,
         algorithm,
         objective,
+        dataset_id: selectedDatasetId,
         weights: objective === 'custom' ? weights : undefined,
       });
       setRouteResult(res);
@@ -108,12 +166,14 @@ export const RouteLabView: React.FC<RouteLabViewProps> = ({ network, airports })
     }
     setLoading(true);
     setError(null);
+    setSelectedSegment(null);
     try {
       const res = await api.compareRoutes({
         origin,
         destination,
         algorithm,
         objective,
+        dataset_id: selectedDatasetId,
       });
       setCompareResult(res);
       if (res.routes && res.routes.length > 0) {
@@ -142,6 +202,8 @@ export const RouteLabView: React.FC<RouteLabViewProps> = ({ network, airports })
     UNCERTAINTY: '#8b5cf6',
   };
 
+  const hasHighUncertainty = (routeResult?.totals?.mean_uncertainty ?? 0) > 0.25;
+
   return (
     <div className="space-y-6">
       {/* Top Controls Grid */}
@@ -150,10 +212,10 @@ export const RouteLabView: React.FC<RouteLabViewProps> = ({ network, airports })
           <div>
             <h2 className="text-lg font-bold text-white flex items-center gap-2 font-mono">
               <Compass className="w-5 h-5 text-cyan-400" />
-              ROUTE OPTIMIZATION LAB
+              DATASET-AWARE ROUTE OPTIMIZATION LAB
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Compare candidate routes under multi-factor edge costs using Dijkstra and A* search
+              Execute multi-factor graph search with weather/congestion hazards, uncertainty penalties, and bidirectional map inspection
             </p>
           </div>
 
@@ -184,7 +246,27 @@ export const RouteLabView: React.FC<RouteLabViewProps> = ({ network, airports })
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* Active Dataset Context Selector */}
+          <div>
+            <label className="block text-xs font-mono text-cyan-400 mb-1 flex items-center gap-1">
+              <Database className="w-3.5 h-3.5" />
+              DATASET CONTEXT
+            </label>
+            <select
+              value={selectedDatasetId}
+              onChange={(e) => handleDatasetChange(e.target.value)}
+              className="w-full bg-aerospace-950 border border-cyan-800/60 rounded-lg px-3 py-2 text-xs font-mono text-cyan-200 focus:outline-none focus:border-cyan-400"
+            >
+              <option value="synthetic_demo_v1">synthetic_demo_v1 (Baseline Demo)</option>
+              {availableDatasets.map((ds) => (
+                <option key={ds.id} value={ds.id}>
+                  {ds.filename} ({ds.row_count} rows)
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Origin Airport */}
           <div>
             <label className="block text-xs font-mono text-slate-400 mb-1">ORIGIN (ICAO)</label>
@@ -241,7 +323,7 @@ export const RouteLabView: React.FC<RouteLabViewProps> = ({ network, airports })
                     : 'bg-aerospace-950 border-aerospace-800 text-slate-400 hover:border-aerospace-700'
                 }`}
               >
-                A* (Admissible)
+                A*
               </button>
             </div>
           </div>
@@ -293,15 +375,112 @@ export const RouteLabView: React.FC<RouteLabViewProps> = ({ network, airports })
         )}
       </div>
 
-      {/* Main Map Visualization */}
-      <AirspaceMap
-        airports={airports}
-        waypoints={network?.waypoints || []}
-        edges={network?.edges || []}
-        primaryRoute={routeResult}
-        secondaryRoute={compareResult?.routes?.find((r) => r.label.includes('distance')) || null}
-        height="500px"
-      />
+      {/* Missing-Data / Coverage Caution Banner */}
+      {routeResult?.found && hasHighUncertainty && (
+        <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-800/80 text-amber-200 text-xs flex items-start gap-3 shadow-lg">
+          <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div>
+            <strong className="font-semibold text-amber-300 block">Data Coverage Notice & Uncertainty Penalty Applied:</strong>
+            <span>
+              One or more segments on this route contain unobserved weather or traffic observations (mean uncertainty {(routeResult.totals?.mean_uncertainty! * 100).toFixed(0)}%). The Sky Force cost model penalizes unobserved hazards with a conservative proxy (0.50) + uncertainty penalty (0.40). This route does <em>not</em> guarantee complete avoidance because physical sensors are unobserved in those sectors.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Main Map Visualization with 2D / 3D Mode Toggle */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-slate-400 px-1">
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-1.5 text-cyan-300 font-semibold">
+              <Compass className="w-3.5 h-3.5" /> AIRSPACE ROUTE VISUALIZATION (CLICK ANY SEGMENT TO INSPECT)
+            </span>
+            {routeResult?.provenance && (
+              <span className="text-[11px] px-2 py-0.5 rounded bg-aerospace-900 border border-aerospace-700 text-slate-300">
+                Provenance:{' '}
+                <strong className="text-cyan-400">
+                  {typeof routeResult.provenance === 'string'
+                    ? routeResult.provenance
+                    : Object.keys(routeResult.provenance).length > 0
+                    ? Object.keys(routeResult.provenance).join(', ')
+                    : 'default_sources'}
+                </strong>
+              </span>
+            )}
+          </div>
+
+          {/* 2D / 3D Mode Switcher */}
+          <div className="flex items-center gap-1 bg-aerospace-950 p-1 rounded-lg border border-aerospace-800">
+            <button
+              type="button"
+              onClick={() => setMapMode('2d')}
+              className={`px-3 py-1 rounded text-xs font-mono font-medium transition ${
+                mapMode === '2d'
+                  ? 'bg-cyan-500 text-aerospace-950 font-bold shadow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              2D Tactical Map
+            </button>
+            <button
+              type="button"
+              onClick={() => setMapMode('3d')}
+              className={`px-3 py-1 rounded text-xs font-mono font-medium transition ${
+                mapMode === '3d'
+                  ? 'bg-cyan-500 text-aerospace-950 font-bold shadow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              3D Volumetric Airspace
+            </button>
+          </div>
+        </div>
+
+        {mapMode === '3d' ? (
+          <Airspace3DMap
+            airports={airports}
+            waypoints={network?.waypoints || []}
+            edges={network?.edges || []}
+            primaryRoute={routeResult}
+            secondaryRoute={compareResult?.routes?.find((r) => r.label.includes('distance')) || null}
+            congestionCells={congestionCells}
+            weatherCells={weatherData}
+            selectedSegmentId={selectedSegment?.edge_id || null}
+            onSelectSegment={(seg) => setSelectedSegment(seg)}
+            height="560px"
+          />
+        ) : (
+          <AirspaceMap
+            airports={airports}
+            waypoints={network?.waypoints || []}
+            edges={network?.edges || []}
+            primaryRoute={routeResult}
+            secondaryRoute={compareResult?.routes?.find((r) => r.label.includes('distance')) || null}
+            congestionCells={congestionCells}
+            weatherCells={weatherData}
+            selectedSegmentId={selectedSegment?.edge_id || null}
+            onSelectSegment={(seg) => setSelectedSegment(seg)}
+            height="520px"
+          />
+        )}
+      </div>
+
+      {/* Along-Track Route Profile Chart (Bidirectional Sync) */}
+      {routeResult?.found && (
+        <RouteProfileChart
+          route={routeResult}
+          selectedSegmentId={selectedSegment?.edge_id || null}
+          onSelectSegment={(seg) => setSelectedSegment(seg)}
+        />
+      )}
+
+      {/* Segment Inspector Drawer / Modal */}
+      {selectedSegment && (
+        <SegmentInspector
+          segment={selectedSegment}
+          onClose={() => setSelectedSegment(null)}
+        />
+      )}
 
       {/* Route Outcomes KPI Banner */}
       {routeResult?.found && routeResult.totals && (
@@ -335,15 +514,15 @@ export const RouteLabView: React.FC<RouteLabViewProps> = ({ network, airports })
           </div>
 
           <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-3">
-            <div className="text-[11px] font-mono text-slate-400">HOPS</div>
-            <div className="text-lg font-bold font-mono text-slate-200 mt-0.5">
-              {routeResult.totals.hops}
+            <div className="text-[11px] font-mono text-slate-400">MEAN UNCERTAINTY</div>
+            <div className="text-lg font-bold font-mono text-purple-300 mt-0.5">
+              {((routeResult.totals.mean_uncertainty || 0) * 100).toFixed(0)}%
             </div>
           </div>
 
           <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-3">
             <div className="text-[11px] font-mono text-slate-400">EXPANDED NODES</div>
-            <div className="text-lg font-bold font-mono text-purple-300 mt-0.5">
+            <div className="text-lg font-bold font-mono text-slate-200 mt-0.5">
               {routeResult.search?.nodes_expanded || 0}
             </div>
           </div>
@@ -357,30 +536,59 @@ export const RouteLabView: React.FC<RouteLabViewProps> = ({ network, airports })
         </div>
       )}
 
-      {/* Route Details & Explainability Cards */}
+      {/* AI Explanation & Cost Breakdown Cards */}
       {routeResult?.found && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {/* Natural Language Explanation Card */}
-          <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-5 shadow-lg space-y-3">
-            <div className="flex items-center gap-2 text-cyan-400 font-mono text-xs font-semibold">
-              <Info className="w-4 h-4" />
-              <span>EXPLAINABILITY & FACTOR ATTRIBUTION</span>
-            </div>
-            <h3 className="text-sm font-bold text-white">Why was this route chosen?</h3>
-            
-            <div className="space-y-2">
-              {routeResult.explanation?.map((item, idx) => (
-                <div key={idx} className="p-2.5 rounded-lg bg-aerospace-950 border border-aerospace-800 text-xs text-slate-300 leading-relaxed flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                  <span>{item}</span>
-                </div>
-              ))}
+          {/* AI Explanation Panel with Phi-3 / Deterministic Fallback */}
+          <ExplanationPanel
+            route={routeResult}
+            baselineRoute={compareResult?.routes?.find((r) => r.label.includes('distance')) || null}
+            objective={objective}
+          />
+
+          {/* Cost Breakdown Bar Chart & Waypoint Sequence */}
+          <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-5 shadow-lg space-y-3 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between text-xs font-mono text-slate-400 mb-2">
+                <span className="flex items-center gap-2 text-cyan-400 font-semibold">
+                  <BarChart2 className="w-4 h-4" />
+                  DIMENSIONLESS COST BREAKDOWN
+                </span>
+                <span>Composite Score: <strong>{routeResult.totals?.composite_score.toFixed(4)}</strong></span>
+              </div>
+
+              <div className="h-44 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={costChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <XAxis dataKey="factor" tick={{ fill: '#94a3b8', fontSize: 11, fontFamily: 'monospace' }} />
+                    <YAxis tick={{ fill: '#94a3b8', fontSize: 11, fontFamily: 'monospace' }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#0f1c3d',
+                        borderColor: '#1d3269',
+                        borderRadius: '8px',
+                        color: '#e2e8f0',
+                        fontSize: '12px',
+                        fontFamily: 'monospace',
+                      }}
+                    />
+                    <Bar dataKey="cost" radius={[4, 4, 0, 0]}>
+                      {costChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={FACTOR_COLORS[entry.factor] || '#3b82f6'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
 
             {/* Waypoint Itinerary */}
-            <div className="pt-2 border-t border-aerospace-800">
-              <div className="text-[11px] font-mono text-slate-400 mb-1.5 uppercase">Waypoint Sequence:</div>
-              <div className="flex flex-wrap gap-1.5 font-mono text-xs">
+            <div className="pt-3 border-t border-aerospace-800">
+              <div className="text-[11px] font-mono text-slate-400 mb-1.5 uppercase flex items-center justify-between">
+                <span>Waypoint Sequence ({routeResult.path?.length || 0} nodes):</span>
+                <span className="text-cyan-400">{routeResult.totals?.hops} hops</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 font-mono text-xs max-h-24 overflow-y-auto">
                 {routeResult.path?.map((node, i) => (
                   <span
                     key={i}
@@ -397,44 +605,6 @@ export const RouteLabView: React.FC<RouteLabViewProps> = ({ network, airports })
               </div>
             </div>
           </div>
-
-          {/* Cost Breakdown Bar Chart */}
-          <div className="bg-aerospace-900 border border-aerospace-800 rounded-xl p-5 shadow-lg space-y-3">
-            <div className="flex items-center justify-between text-xs font-mono text-slate-400">
-              <span className="flex items-center gap-2 text-cyan-400 font-semibold">
-                <BarChart2 className="w-4 h-4" />
-                DIMENSIONLESS COST BREAKDOWN
-              </span>
-              <span>Total Score: {routeResult.totals?.composite_score.toFixed(4)}</span>
-            </div>
-
-            <div className="h-48 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={costChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <XAxis dataKey="factor" tick={{ fill: '#94a3b8', fontSize: 11, fontFamily: 'monospace' }} />
-                  <YAxis tick={{ fill: '#94a3b8', fontSize: 11, fontFamily: 'monospace' }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#0f1c3d',
-                      borderColor: '#1d3269',
-                      borderRadius: '8px',
-                      color: '#e2e8f0',
-                      fontSize: '12px',
-                      fontFamily: 'monospace',
-                    }}
-                  />
-                  <Bar dataKey="cost" radius={[4, 4, 0, 0]}>
-                    {costChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={FACTOR_COLORS[entry.factor] || '#3b82f6'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <p className="text-[11px] text-slate-400 font-mono">
-              Components are dimensionless normalised lengths: length / ref_km scaled by active weights.
-            </p>
-          </div>
         </div>
       )}
 
@@ -447,7 +617,7 @@ export const RouteLabView: React.FC<RouteLabViewProps> = ({ network, airports })
               MULTI-OBJECTIVE CANDIDATE COMPARISON
             </h3>
             <span className="text-xs font-mono text-slate-400">
-              {compareResult.routes.length} Pareto alternatives generated
+              {compareResult.routes.length} Pareto alternatives evaluated
             </span>
           </div>
 
@@ -460,6 +630,7 @@ export const RouteLabView: React.FC<RouteLabViewProps> = ({ network, airports })
                   <th className="py-2.5 px-3">ETA</th>
                   <th className="py-2.5 px-3">Weather Exp</th>
                   <th className="py-2.5 px-3">Congestion Exp</th>
+                  <th className="py-2.5 px-3">Uncertainty</th>
                   <th className="py-2.5 px-3">Score</th>
                   <th className="py-2.5 px-3">Hops</th>
                   <th className="py-2.5 px-3">Action</th>
@@ -473,11 +644,17 @@ export const RouteLabView: React.FC<RouteLabViewProps> = ({ network, airports })
                     <td className="py-2.5 px-3">{r.totals?.estimated_time_min} min</td>
                     <td className="py-2.5 px-3 text-amber-400">{r.totals?.weather_exposure_km} km</td>
                     <td className="py-2.5 px-3 text-rose-400">{r.totals?.congestion_exposure_km} km</td>
+                    <td className="py-2.5 px-3 text-purple-300">
+                      {((r.totals?.mean_uncertainty || 0) * 100).toFixed(0)}%
+                    </td>
                     <td className="py-2.5 px-3 font-bold text-white">{r.totals?.composite_score.toFixed(4)}</td>
                     <td className="py-2.5 px-3">{r.totals?.hops}</td>
                     <td className="py-2.5 px-3">
                       <button
-                        onClick={() => setRouteResult(r)}
+                        onClick={() => {
+                          setRouteResult(r);
+                          setSelectedSegment(null);
+                        }}
                         className="px-2 py-1 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 hover:bg-cyan-900 text-[11px]"
                       >
                         Inspect

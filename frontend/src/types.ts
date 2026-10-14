@@ -85,6 +85,8 @@ export interface RouteDetail {
   label: string;
   algorithm: string;
   route_id?: string;
+  dataset_id?: string;
+  run_id?: string;
   path?: string[];
   geometry?: [number, number][];
   totals?: RouteTotals;
@@ -104,12 +106,15 @@ export interface CompareRoutesResponse {
   origin: string;
   destination: string;
   scenario_id?: string;
+  dataset_id?: string;
+  run_id?: string;
   selected_objective: string;
   algorithm: string;
   routes: RouteDetail[];
   closed_edges_avoided: { edge_id: string; reasons: string[] }[];
   explanation: string[];
 }
+
 
 export interface ScenarioEvent {
   id: string;
@@ -216,3 +221,143 @@ export interface ModelsStatusResponse {
   training_summary: Record<string, any>;
   disclaimer: string;
 }
+
+export interface ColumnInfo {
+  name: string;
+  dtype: string;
+  non_null_count: number;
+  null_count: number;
+  sample_values: any[];
+}
+
+export type DatasetType = 'aircraft_observations' | 'weather_observations' | 'congestion_cells';
+
+export interface DatasetUploadResponse {
+  dataset_id: string;
+  filename: string;
+  dataset_type: DatasetType;
+  file_size_bytes: number;
+  row_count: number;
+  col_count: number;
+  detected_columns: string[];
+  suggested_mapping: Record<string, string>;
+  columns_info: ColumnInfo[];
+  is_valid_format: boolean;
+  validation_warnings: string[];
+  upload_timestamp_utc: string;
+}
+
+export interface DatasetSummaryItem {
+  id: string;
+  filename: string;
+  dataset_type: DatasetType;
+  file_size_bytes: number;
+  row_count: number;
+  col_count: number;
+  uploaded_at_utc: string;
+  status: string;
+  is_active: boolean;
+  pipeline_stages: Record<string, string>;
+  provenance: string;
+  linked_weather_dataset_id?: string | null;
+}
+
+export interface DatasetDetailResponse {
+  id: string;
+  filename: string;
+  dataset_type: DatasetType;
+  file_size_bytes: number;
+  row_count: number;
+  col_count: number;
+  uploaded_at_utc: string;
+  status: string;
+  schema_mapping: Record<string, string>;
+  validation_report: Record<string, any>;
+  pipeline_runs: {
+    stage: string;
+    status: string;
+    elapsed_seconds: number;
+    summary?: Record<string, any>;
+  }[];
+  available_artifacts: Record<string, string>;
+  active_in_routing: boolean;
+  provenance: string;
+  linked_weather_dataset_id?: string | null;
+}
+
+export interface LinkWeatherResponse {
+  aircraft_dataset_id: string;
+  weather_dataset_id: string;
+  status: string;
+  total_traffic_rows: number;
+  matched_rows: number;
+  unmatched_rows: number;
+  coverage_percentage: number;
+  warnings: string[];
+  artifact_path: string;
+}
+
+export interface DatasetRawPreviewResponse {
+  dataset_id: string;
+  filename: string;
+  total_rows: number;
+  page: number;
+  page_size: number;
+  columns: string[];
+  rows: Record<string, any>[];
+}
+
+export interface PipelineStageResult {
+  stage: string;
+  status: string;
+  elapsed_seconds: number;
+  output_summary: Record<string, any>;
+  warnings: string[];
+}
+
+export interface RunPipelineResponse {
+  dataset_id: string;
+  status: string;
+  total_elapsed_seconds: number;
+  stages: PipelineStageResult[];
+  artifact_paths: Record<string, string>;
+}
+
+export interface ExplanationResponse {
+  task: string;
+  summary: string;
+  supporting_facts: string[];
+  limitations: string[];
+  engine: string;
+  model_name: string;
+  ollama_available: boolean;
+  latency_ms: number;
+  disclaimer: string;
+}
+
+export interface ExplanationEngineStatus {
+  ollama_available: boolean;
+  active_engine: string;
+  model_name: string;
+  ollama_url: string;
+}
+
+export interface WeatherObservationItem {
+  location_id: string;
+  latitude: number;
+  longitude: number;
+  valid_time_utc: string;
+  temperature_2m_c?: number;
+  relative_humidity_2m_pct?: number;
+  surface_pressure_hpa?: number;
+  precipitation_mm?: number;
+  cloud_cover_pct?: number;
+  wind_speed_10m_ms?: number;
+  wind_direction_10m_deg?: number;
+  wind_gusts_10m_ms?: number;
+  severity?: number;
+  source?: string;
+  product?: string;
+  is_synthetic?: boolean;
+}
+

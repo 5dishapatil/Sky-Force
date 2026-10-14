@@ -7,11 +7,14 @@ import {
   ChevronRight,
   Database,
   FlaskConical,
+  FolderGit2,
   Gauge,
+  Layers,
   Map,
   Plane,
   Route,
   ShieldCheck,
+  UploadCloud,
   Zap,
 } from 'lucide-react';
 
@@ -30,6 +33,8 @@ const navigationGroups = [
     label: 'WORKSPACE',
     items: [
       { id: 'overview', label: 'Mission Control', icon: Gauge },
+      { id: 'studio', label: 'Dataset Studio', icon: UploadCloud },
+      { id: 'dataset-explorer', label: 'Dataset Lifecycle', icon: FolderGit2 },
       { id: 'explorer', label: 'Airspace Explorer', icon: Map },
       { id: 'routing', label: 'Route Optimization', icon: Route },
       { id: 'scenarios', label: 'Scenario Studio', icon: Zap },
@@ -45,9 +50,7 @@ const navigationGroups = [
   {
     label: 'VALIDATION',
     items: [
-      { id: 'conflicts', label: 'Conflict / CPA', icon: AlertTriangle },
       { id: 'quality', label: 'Data & QA', icon: ShieldCheck },
-      { id: 'docs', label: 'Research Guide', icon: BookOpen },
     ],
   },
 ];

@@ -64,6 +64,46 @@ export const api = {
   getCongestionCells: () => fetchJson<any[]>('/congestion/cells'),
   getCongestionTimeSeries: (cellId: string) => fetchJson<any>(`/congestion/timeseries?cell_id=${encodeURIComponent(cellId)}`),
   
+  // Datasets Studio Endpoints
+  getDatasets: () => fetchJson<any[]>('/datasets'),
+  getDataset: (id: string) => fetchJson<any>(`/datasets/${encodeURIComponent(id)}`),
+  getDatasetPreview: (id: string, page = 1, pageSize = 50) =>
+    fetchJson<any>(`/datasets/${encodeURIComponent(id)}/preview?page=${page}&page_size=${pageSize}`),
+  uploadDataset: async (file: File, datasetType = 'aircraft_observations') => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('dataset_type', datasetType);
+    const resp = await fetch('/api/datasets/upload', {
+      method: 'POST',
+      body: formData,
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err?.error?.message || err?.detail || 'Upload failed');
+    }
+    return resp.json();
+  },
+  runDatasetPipeline: (id: string, payload: { stages: string[]; custom_mapping?: Record<string, string> }) =>
+    fetchJson<any>(`/datasets/${encodeURIComponent(id)}/pipeline`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  linkWeather: (aircraftId: string, weatherId: string) =>
+    fetchJson<any>(`/datasets/${encodeURIComponent(aircraftId)}/link-weather`, {
+      method: 'POST',
+      body: JSON.stringify({ weather_dataset_id: weatherId }),
+    }),
+  getDatasetArtifactUrl: (id: string, artifact: string) =>
+    `/api/datasets/${encodeURIComponent(id)}/export/${encodeURIComponent(artifact)}`,
+
+  // Explanation Endpoints
+  getExplanationStatus: () => fetchJson<any>('/explain/status'),
+  getExplanation: (payload: { task: string; context_data: any; user_query?: string }) =>
+    fetchJson<any>('/explain', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
   optimizeRoute: (payload: {
     origin: string;
     destination: string;
@@ -71,6 +111,8 @@ export const api = {
     objective?: string;
     weights?: Record<string, number>;
     scenario_id?: string;
+    dataset_id?: string;
+    run_id?: string;
   }) => fetchJson<RouteDetail>('/routes/optimize', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -82,13 +124,15 @@ export const api = {
     algorithm?: string;
     objective?: string;
     scenario_id?: string;
+    dataset_id?: string;
+    run_id?: string;
   }) => fetchJson<CompareRoutesResponse>('/routes/compare', {
     method: 'POST',
     body: JSON.stringify(payload),
   }),
   
-  getParetoRoutes: (origin: string, destination: string, scenarioId?: string) =>
-    fetchJson<any>(`/routes/pareto?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}${scenarioId ? `&scenario_id=${encodeURIComponent(scenarioId)}` : ''}`),
+  getParetoRoutes: (origin: string, destination: string, scenarioId?: string, datasetId?: string) =>
+    fetchJson<any>(`/routes/pareto?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}${scenarioId ? `&scenario_id=${encodeURIComponent(scenarioId)}` : ''}${datasetId ? `&dataset_id=${encodeURIComponent(datasetId)}` : ''}`),
   
   getScenarios: () => fetchJson<Scenario[]>('/scenarios'),
   activateScenario: (scenarioId: string) => fetchJson<Scenario>(`/scenarios/${encodeURIComponent(scenarioId)}/activate`, { method: 'POST' }),
@@ -118,3 +162,4 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 };
+

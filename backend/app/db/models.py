@@ -268,3 +268,35 @@ class ConflictAnalysisRun(Base):
     snapshot_time_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     thresholds: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     events: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+
+
+class UploadedDataset(Base):
+    __tablename__ = "uploaded_datasets"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    filename: Mapped[str] = mapped_column(String(255))
+    dataset_type: Mapped[str] = mapped_column(String(50), default="aircraft_observations")  # aircraft_observations | weather_observations | congestion_cells
+    stored_path: Mapped[str] = mapped_column(Text)
+    file_size_bytes: Mapped[int] = mapped_column(Integer)
+    row_count: Mapped[int] = mapped_column(Integer, default=0)
+    col_count: Mapped[int] = mapped_column(Integer, default=0)
+    uploaded_at_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    status: Mapped[str] = mapped_column(String(32), default="uploaded")  # uploaded | validated | processed | error
+    schema_mapping: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    validation_report: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    linked_weather_dataset_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class DatasetRun(Base):
+    __tablename__ = "dataset_runs"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    dataset_id: Mapped[str] = mapped_column(ForeignKey("uploaded_datasets.id", ondelete="CASCADE"), index=True)
+    dataset_type: Mapped[str] = mapped_column(String(50), default="aircraft_observations")
+    created_at_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    stage: Mapped[str] = mapped_column(String(32))  # validation | quality | segmentation | features | inference | routing | weather_indexing | linking
+    status: Mapped[str] = mapped_column(String(32))  # completed | failed | running
+    elapsed_seconds: Mapped[float] = mapped_column(Float, default=0.0)
+    summary_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    artifact_paths: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    linked_weather_dataset_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+

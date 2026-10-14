@@ -91,7 +91,6 @@ export const CongestionIntelligenceView: React.FC<CongestionIntelligenceViewProp
         </div>
       </div>
 
-      {dataError && <div className="view-inline-error" role="alert"><AlertCircle size={16} /><div><strong>Some congestion data is unavailable</strong><p>{dataError}</p></div></div>}
       {loading && <div className="loading-strip"><span className="loading-spinner" /> Loading congestion and feature-importance data…</div>}
       {/* Model Architecture Card & Metrics */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
