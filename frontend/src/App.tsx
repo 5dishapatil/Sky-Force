@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, AlertCircle, ArrowUpRight, Database, ShieldAlert } from 'lucide-react';
+import { Activity, AlertCircle, ArrowUpRight, BookOpen, Database, HelpCircle, ShieldAlert } from 'lucide-react';
 import { Header, tabLabels } from './components/Header';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { OverviewView } from './views/OverviewView';
@@ -137,6 +137,15 @@ export function App() {
             <h1>{activeTitle}</h1>
           </div>
           <div className="topbar-meta">
+            <button
+              type="button"
+              onClick={() => setActiveTab('docs')}
+              className="px-2.5 py-1.5 rounded-md border border-cyan-700/60 bg-cyan-950/40 text-cyan-300 hover:bg-cyan-900/60 hover:text-cyan-200 transition-colors inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer shadow-sm"
+              title="Open Operator Guide, Step-by-Step Playbook and Viva Defense Manual"
+            >
+              <BookOpen size={13} className="text-cyan-400" />
+              <span>Operator Guide</span>
+            </button>
             <div className={`connection-pill ${isHealthy ? 'is-good' : systemStatus.status === 'CHECKING' ? 'is-pending' : 'is-warning'}`}>
               <span className="status-indicator" />
               <span>{isHealthy ? 'API connected' : systemStatus.status === 'CHECKING' ? 'Checking API' : 'API degraded'}</span>
@@ -198,7 +207,7 @@ export function App() {
             {activeTab === 'congestion' && <CongestionIntelligenceView modelsStatus={modelsStatus} />}
             {activeTab === 'evaluation' && <ModelEvaluationView modelsStatus={modelsStatus} />}
             {activeTab === 'quality' && <DataQualityView />}
-            {activeTab === 'docs' && <DocumentationView />}
+            {activeTab === 'docs' && <DocumentationView onNavigate={setActiveTab} />}
             </ErrorBoundary>
           </div>
         </main>

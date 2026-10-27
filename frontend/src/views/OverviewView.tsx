@@ -2,13 +2,23 @@ import React from 'react';
 import {
   Activity,
   ArrowRight,
+  BookOpen,
   BrainCircuit,
+  CloudLightning,
+  Compass,
   Database,
+  FolderGit2,
   GitBranch,
+  HelpCircle,
+  Map,
   MapPinned,
+  Play,
   Route,
   ShieldCheck,
+  Sparkles,
+  UploadCloud,
   Waypoints,
+  Zap,
 } from 'lucide-react';
 import type { Airport, AirspaceNetwork, CongestionCell, ModelsStatusResponse } from '../types';
 import { AirspaceMap } from '../components/AirspaceMap';
@@ -43,8 +53,62 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     { label: 'ML models loaded', value: modelsStatus ? `${loadedModels} / 2` : '—', sub: modelsStatus ? `${congestionLoaded ? 'Classifier ready' : 'Classifier unavailable'} · ${etaLoaded ? 'ETA ready' : 'ETA unavailable'}` : 'Model status unavailable', icon: BrainCircuit, accent: modelsStatus && loadedModels === 2 ? 'green' : 'amber' },
   ];
 
+  const workflowSteps = [
+    {
+      num: '01',
+      title: 'Dataset Studio',
+      tab: 'studio',
+      tag: 'INGEST',
+      color: 'border-cyan-500/40 text-cyan-400 bg-cyan-950/20',
+      icon: UploadCloud,
+      desc: 'Upload custom CSVs with multi-schema mapping and spatiotemporal weather linking.',
+      actionLabel: 'Open Studio',
+    },
+    {
+      num: '02',
+      title: 'Airspace Explorer',
+      tab: 'explorer',
+      tag: 'SURVEILLANCE',
+      color: 'border-blue-500/40 text-blue-400 bg-blue-950/20',
+      icon: Map,
+      desc: 'Visualize aircraft telemetry, 2° spatial grid density, and live storms in 2D or 3D.',
+      actionLabel: 'View Airspace',
+    },
+    {
+      num: '03',
+      title: 'Scenario Studio',
+      tab: 'scenarios',
+      tag: 'DISRUPTIONS',
+      color: 'border-amber-500/40 text-amber-400 bg-amber-950/20',
+      icon: Zap,
+      desc: 'Simulate severe convective storm cells, runway closures, and sector shutdowns.',
+      actionLabel: 'Test Scenarios',
+    },
+    {
+      num: '04',
+      title: 'Route Optimization',
+      tab: 'routing',
+      tag: 'MULTI-OBJECTIVE',
+      color: 'border-emerald-500/40 text-emerald-400 bg-emerald-950/20',
+      icon: Route,
+      desc: 'Solve A* / Dijkstra paths with Pareto frontiers, 3D deck.gl profiles, and LLM explanations.',
+      actionLabel: 'Plan Route',
+    },
+    {
+      num: '05',
+      title: 'AI Intelligence & QA',
+      tab: 'congestion',
+      tag: 'VALIDATION',
+      color: 'border-purple-500/40 text-purple-400 bg-purple-950/20',
+      icon: BrainCircuit,
+      desc: 'Examine Random Forest congestion forecasts, segment ETAs, and 9-stage scrubber QA.',
+      actionLabel: 'Inspect Models',
+    },
+  ];
+
   return (
-    <div className="space-y-5 page-overview">
+    <div className="space-y-6 page-overview">
+      {/* Hero Banner */}
       <section className="overview-intro">
         <div className="overview-intro-copy">
           <div className="section-kicker"><span className="kicker-dot" /> AIRSPACE DECISION SUPPORT · INDIA</div>
@@ -56,6 +120,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <div className="overview-actions">
             <button type="button" className="action-primary" onClick={() => onNavigate('routing')}>
               <Route size={16} /> Plan a route <ArrowRight size={15} />
+            </button>
+            <button type="button" className="action-secondary" onClick={() => onNavigate('docs')}>
+              <BookOpen size={16} /> How to operate this project
             </button>
             <button type="button" className="action-secondary" onClick={() => onNavigate('congestion')}>
               <BrainCircuit size={16} /> Inspect ML models
@@ -74,6 +141,73 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         </div>
       </section>
 
+      {/* 5-Step Interactive Operating Pipeline */}
+      <section className="bg-gradient-to-r from-aerospace-900/95 via-aerospace-850 to-aerospace-900 border border-cyan-800/50 rounded-xl p-5 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-aerospace-800">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
+              <h3 className="text-sm font-bold font-mono tracking-wider text-white uppercase flex items-center gap-2">
+                OPERATIONAL PIPELINE & NAVIGATION WORKFLOW
+              </h3>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              New to Sky Force? Follow this standard 5-step operational flow to operate every capability in this platform.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onNavigate('docs')}
+            className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-950/80 border border-cyan-600/60 text-cyan-300 text-xs font-semibold hover:bg-cyan-900/60 transition-all cursor-pointer shadow-sm"
+          >
+            <BookOpen size={13} />
+            <span>Open Complete Operator Manual</span>
+            <ArrowRight size={12} />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          {workflowSteps.map((step) => {
+            const StepIcon = step.icon;
+            return (
+              <div
+                key={step.num}
+                className={`flex flex-col justify-between p-3.5 rounded-lg border bg-aerospace-950/80 hover:bg-aerospace-900 transition-all group ${step.color.split(' ')[0]}`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-mono text-xs font-bold text-slate-400 group-hover:text-cyan-400 transition-colors">
+                      {step.num}
+                    </span>
+                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-semibold border ${step.color}`}>
+                      {step.tag}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <StepIcon size={16} className={step.color.split(' ')[1]} />
+                    <h4 className="text-xs font-bold text-slate-100 group-hover:text-white">
+                      {step.title}
+                    </h4>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed font-sans mb-3">
+                    {step.desc}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onNavigate(step.tab)}
+                  className="w-full mt-auto py-1.5 px-2.5 rounded bg-aerospace-800/80 hover:bg-cyan-600 text-slate-200 hover:text-white text-[11px] font-semibold transition-all inline-flex items-center justify-between cursor-pointer"
+                >
+                  <span>{step.actionLabel}</span>
+                  <ArrowRight size={12} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Top Stats */}
       <section className="stats-grid" aria-label="System summary">
         {statCards.map((card) => {
           const Icon = card.icon;
@@ -87,6 +221,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         })}
       </section>
 
+      {/* Main Grid: Airspace Map + Side Panels */}
       <section className="overview-grid">
         <article className="surface-card overview-map-card">
           <div className="surface-card-heading">
@@ -151,20 +286,21 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         </aside>
       </section>
 
+      {/* Quick Jump Grid */}
       <section className="quick-path-grid">
-        <button type="button" className="quick-path-card" onClick={() => onNavigate('congestion')}>
-          <span className="quick-path-icon cyan-icon"><BrainCircuit size={19} /></span>
-          <span><strong>Congestion Intelligence</strong><small>Inspect model readiness, predictions, and feature importance.</small></span>
+        <button type="button" className="quick-path-card" onClick={() => onNavigate('studio')}>
+          <span className="quick-path-icon cyan-icon"><UploadCloud size={19} /></span>
+          <span><strong>Dataset Studio</strong><small>Upload, map, and link custom CSV flight telemetry & weather.</small></span>
           <ArrowRight size={16} />
         </button>
         <button type="button" className="quick-path-card" onClick={() => onNavigate('routing')}>
           <span className="quick-path-icon blue-icon"><Route size={19} /></span>
-          <span><strong>Route Optimization</strong><small>Compare distance, travel time, weather, and congestion costs.</small></span>
+          <span><strong>Route Optimization</strong><small>Calculate 2D/3D multi-objective routes with Pareto alternatives.</small></span>
           <ArrowRight size={16} />
         </button>
-        <button type="button" className="quick-path-card" onClick={() => onNavigate('scenarios')}>
-          <span className="quick-path-icon amber-icon"><Activity size={19} /></span>
-          <span><strong>Disruption Simulation</strong><small>Activate a scenario and compare a rerouted path.</small></span>
+        <button type="button" className="quick-path-card" onClick={() => onNavigate('docs')}>
+          <span className="quick-path-icon purple-icon"><BookOpen size={19} /></span>
+          <span><strong>Operator Guide & Playbook</strong><small>Step-by-step instructions for every screen, feature, and viva Q&A.</small></span>
           <ArrowRight size={16} />
         </button>
       </section>

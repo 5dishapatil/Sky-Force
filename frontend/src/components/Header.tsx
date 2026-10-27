@@ -48,9 +48,10 @@ const navigationGroups = [
     ],
   },
   {
-    label: 'VALIDATION',
+    label: 'GUIDANCE & QA',
     items: [
       { id: 'quality', label: 'Data & QA', icon: ShieldCheck },
+      { id: 'docs', label: 'Operator Guide & Docs', icon: BookOpen },
     ],
   },
 ];
