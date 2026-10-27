@@ -1,9 +1,16 @@
 import type {
   AirspaceNetwork,
+  AlternativeFlightsResponse,
   CompareRoutesResponse,
   ConflictScanResponse,
+  DataReadinessReport,
+  DelayDashboardResponse,
+  DelayPredictionRequest,
   DynamicRerouteResponse,
+  FlightDetail,
+  FlightSearchResponse,
   ModelsStatusResponse,
+  OperationalStage,
   RouteDetail,
   Scenario,
 } from '../types';
@@ -161,5 +168,45 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-};
 
+  // --- Sky Force 2.0: Flight Delay Intelligence Endpoints ---
+  getDelayFlights: (params?: {
+    query?: string;
+    date?: string;
+    origin?: string;
+    destination?: string;
+    limit?: number;
+    offset?: number;
+  }) => {
+    const q = new URLSearchParams();
+    if (params?.query) q.set('query', params.query);
+    if (params?.date) q.set('date', params.date);
+    if (params?.origin) q.set('origin', params.origin);
+    if (params?.destination) q.set('destination', params.destination);
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.offset) q.set('offset', String(params.offset));
+    const qs = q.toString();
+    return fetchJson<FlightSearchResponse>(`/delay/flights${qs ? `?${qs}` : ''}`);
+  },
+
+  getDelayFlightDetail: (flightId: string) =>
+    fetchJson<FlightDetail>(`/delay/flights/${encodeURIComponent(flightId)}`),
+
+  getDelayFlightTimeline: (flightId: string) =>
+    fetchJson<OperationalStage[]>(`/delay/flights/${encodeURIComponent(flightId)}/timeline`),
+
+  getDelayFlightAlternatives: (flightId: string) =>
+    fetchJson<AlternativeFlightsResponse>(`/delay/flights/${encodeURIComponent(flightId)}/alternatives`),
+
+  predictDelayScenario: (payload: DelayPredictionRequest) =>
+    fetchJson<FlightDetail>('/delay/predict', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getDelayDashboard: (sampleSize = 150) =>
+    fetchJson<DelayDashboardResponse>(`/delay/dashboard?sample_size=${encodeURIComponent(String(sampleSize))}`),
+
+  getDelayReadiness: () =>
+    fetchJson<DataReadinessReport>('/delay/readiness'),
+};

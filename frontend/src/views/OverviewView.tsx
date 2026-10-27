@@ -4,6 +4,7 @@ import {
   ArrowRight,
   BookOpen,
   BrainCircuit,
+  Clock,
   CloudLightning,
   Compass,
   Database,
@@ -96,7 +97,17 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     },
     {
       num: '05',
-      title: 'AI Intelligence & QA',
+      title: 'Flight Delay AI',
+      tab: 'delay-intelligence',
+      tag: 'PASSENGER & OPS',
+      color: 'border-cyan-500/40 text-cyan-300 bg-cyan-950/20',
+      icon: Clock,
+      desc: 'Flight-level departure delay predictions, airframe rotations, and 8-stage progress timelines.',
+      actionLabel: 'Inspect Delays',
+    },
+    {
+      num: '06',
+      title: 'Congestion AI & QA',
       tab: 'congestion',
       tag: 'VALIDATION',
       color: 'border-purple-500/40 text-purple-400 bg-purple-950/20',
@@ -114,18 +125,18 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <div className="section-kicker"><span className="kicker-dot" /> AIRSPACE DECISION SUPPORT · INDIA</div>
           <h2>See the airspace.<br /><span>Anticipate what changes next.</span></h2>
           <p>
-            Explore aircraft observations, inspect machine-learning forecasts, and compare routes under
-            weather, congestion, and simulated corridor disruptions.
+            Explore aircraft observations, inspect machine-learning forecasts, analyze flight departure delays,
+            and compare routes under weather, congestion, and simulated corridor disruptions.
           </p>
           <div className="overview-actions">
             <button type="button" className="action-primary" onClick={() => onNavigate('routing')}>
               <Route size={16} /> Plan a route <ArrowRight size={15} />
             </button>
-            <button type="button" className="action-secondary" onClick={() => onNavigate('docs')}>
-              <BookOpen size={16} /> How to operate this project
+            <button type="button" className="action-secondary" onClick={() => onNavigate('delay-intelligence')}>
+              <Clock size={16} /> Flight Delay AI
             </button>
-            <button type="button" className="action-secondary" onClick={() => onNavigate('congestion')}>
-              <BrainCircuit size={16} /> Inspect ML models
+            <button type="button" className="action-secondary" onClick={() => onNavigate('docs')}>
+              <BookOpen size={16} /> How to operate
             </button>
           </div>
         </div>
@@ -141,7 +152,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         </div>
       </section>
 
-      {/* 5-Step Interactive Operating Pipeline */}
+      {/* 6-Step Interactive Operating Pipeline */}
       <section className="bg-gradient-to-r from-aerospace-900/95 via-aerospace-850 to-aerospace-900 border border-cyan-800/50 rounded-xl p-5 shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-aerospace-800">
           <div>
@@ -152,7 +163,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               </h3>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              New to Sky Force? Follow this standard 5-step operational flow to operate every capability in this platform.
+              Sky Force 2.0 multi-role architecture: Ingest surveillance, simulate hazards, optimize routes, and forecast flight departure delays.
             </p>
           </div>
           <button
@@ -166,7 +177,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {workflowSteps.map((step) => {
             const StepIcon = step.icon;
             return (
@@ -183,8 +194,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       {step.tag}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <StepIcon size={16} className={step.color.split(' ')[1]} />
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <StepIcon size={15} className={step.color.split(' ')[1]} />
                     <h4 className="text-xs font-bold text-slate-100 group-hover:text-white">
                       {step.title}
                     </h4>
@@ -196,10 +207,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 <button
                   type="button"
                   onClick={() => onNavigate(step.tab)}
-                  className="w-full mt-auto py-1.5 px-2.5 rounded bg-aerospace-800/80 hover:bg-cyan-600 text-slate-200 hover:text-white text-[11px] font-semibold transition-all inline-flex items-center justify-between cursor-pointer"
+                  className="w-full mt-auto py-1.5 px-2 rounded bg-aerospace-800/80 hover:bg-cyan-600 text-slate-200 hover:text-white text-[11px] font-semibold transition-all inline-flex items-center justify-between cursor-pointer"
                 >
                   <span>{step.actionLabel}</span>
-                  <ArrowRight size={12} />
+                  <ArrowRight size={11} />
                 </button>
               </div>
             );
@@ -264,21 +275,25 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <div className="model-status-copy"><strong>Segment ETA regressor</strong><span>{modelsStatus?.eta_model?.name || (modelsStatus ? 'Model metadata unavailable' : 'Awaiting model status')}</span></div>
               <span className={`status-tag ${etaLoaded ? 'tag-good' : 'tag-muted'}`}>{!modelsStatus ? 'STATUS UNKNOWN' : etaLoaded ? 'LOADED' : 'NOT LOADED'}</span>
             </div>
-            {!modelsStatus && <p className="inline-note"><Database size={14} /> Model status is unavailable. Check that the backend and model artifacts are ready.</p>}
-            <button type="button" className="full-width-link" onClick={() => onNavigate('evaluation')}>View evaluation evidence <ArrowRight size={14} /></button>
+            <div className="model-status-row">
+              <div className="model-status-icon model-status-icon-purple"><Clock size={16} /></div>
+              <div className="model-status-copy"><strong>Flight Delay Estimator</strong><span>Rotational Delay & Turnaround Buffer Model</span></div>
+              <span className="status-tag tag-good">DEMO READY</span>
+            </div>
+            <button type="button" className="full-width-link" onClick={() => onNavigate('delay-intelligence')}>View flight delay dashboard <ArrowRight size={14} /></button>
           </article>
 
           <article className="surface-card pipeline-card">
             <div className="surface-card-heading compact-heading">
-              <div><p className="eyebrow">END-TO-END FLOW</p><h3>From observations to routes</h3></div>
+              <div><p className="eyebrow">END-TO-END FLOW</p><h3>From observations to routes & delays</h3></div>
               <GitBranch size={19} className="text-cyan-300" />
             </div>
             <div className="pipeline-steps">
               <div className="pipeline-step"><span className="pipeline-step-number">01</span><span><strong>Ingest & validate</strong><small>Observations · weather · QA</small></span></div>
               <div className="pipeline-connector" />
-              <div className="pipeline-step"><span className="pipeline-step-number">02</span><span><strong>Predict</strong><small>Congestion class · segment ETA</small></span></div>
+              <div className="pipeline-step"><span className="pipeline-step-number">02</span><span><strong>Predict & Estimate</strong><small>Congestion · ETA · Flight Delays</small></span></div>
               <div className="pipeline-connector" />
-              <div className="pipeline-step"><span className="pipeline-step-number">03</span><span><strong>Optimize & evaluate</strong><small>A* / Dijkstra · scenario rerouting</small></span></div>
+              <div className="pipeline-step"><span className="pipeline-step-number">03</span><span><strong>Optimize & Explain</strong><small>A* / Pareto · 8-stage timeline</small></span></div>
             </div>
             <div className="provenance-note"><ShieldCheck size={15} /><span>Research dataset. Synthetic and observed records must remain clearly distinguished.</span></div>
             <button type="button" className="full-width-link" onClick={() => onNavigate('quality')}>Inspect data & provenance <ArrowRight size={14} /></button>
@@ -288,14 +303,19 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
       {/* Quick Jump Grid */}
       <section className="quick-path-grid">
-        <button type="button" className="quick-path-card" onClick={() => onNavigate('studio')}>
-          <span className="quick-path-icon cyan-icon"><UploadCloud size={19} /></span>
-          <span><strong>Dataset Studio</strong><small>Upload, map, and link custom CSV flight telemetry & weather.</small></span>
+        <button type="button" className="quick-path-card" onClick={() => onNavigate('delay-intelligence')}>
+          <span className="quick-path-icon cyan-icon"><Clock size={19} /></span>
+          <span><strong>Flight Delay Intelligence</strong><small>Forecast flight delays, inspect rotations, and simulate what-if scenarios.</small></span>
           <ArrowRight size={16} />
         </button>
         <button type="button" className="quick-path-card" onClick={() => onNavigate('routing')}>
           <span className="quick-path-icon blue-icon"><Route size={19} /></span>
           <span><strong>Route Optimization</strong><small>Calculate 2D/3D multi-objective routes with Pareto alternatives.</small></span>
+          <ArrowRight size={16} />
+        </button>
+        <button type="button" className="quick-path-card" onClick={() => onNavigate('studio')}>
+          <span className="quick-path-icon amber-icon"><UploadCloud size={19} /></span>
+          <span><strong>Dataset Studio</strong><small>Upload, map, and link custom CSV flight telemetry & weather.</small></span>
           <ArrowRight size={16} />
         </button>
         <button type="button" className="quick-path-card" onClick={() => onNavigate('docs')}>

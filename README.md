@@ -108,6 +108,16 @@ Every raw trajectory undergoes 9 sequential filters in `backend/app/services/pre
 - Automatically detects local **Ollama** (`phi3:latest`) for natural language trade-off justifications.
 - Gracefully falls back to a deterministic, rule-based expert system if the LLM is absent or times out.
 
+### 3.7 Sky Force 2.0: Passenger-Centred Delay Prediction & Operations Console
+Sky Force 2.0 extends the platform into a dual-role aviation intelligence system with zero loss of existing capabilities:
+- **Dual-Role Navigation:** Seamless role-aware switching between:
+  1. **Passenger Portal:** Designed for travelers needing transparent, honest flight delay updates. Features flight search with demo suggestions, plain-English delay summaries, calibrated interval estimates (e.g., 20 to 35 min), distinct gate vs runway departure times, an 8-stage operational progress timeline, transparent factor attribution (Confirmed, Model-inferred, Unavailable), and same-day alternative flights.
+  2. **Operations Console (`delay-intelligence`):** Fleet delay distribution, deep-dive flight inspector with waterfall factor decomposition, what-if scenario simulator (modulating inbound delays, airport queues, weather severity, and departure slot holds), direct bridge to Route Lab, and an honest Data Readiness & Production Gap Report.
+- **Aviation Mechanics Integrity:**
+  - Strictly distinguishes **Gate Off-Block Pushback Time** ($STD \to \text{Off-Block}$) from **Runway Take-Off Time** ($STD + \text{Taxi-Out} + \text{Hold}$).
+  - Clarifies that dynamic en-route airway rerouting optimizes airborne flight duration ($t_\text{air}$) and circumvents storm cells, but cannot resolve ground turnaround deficits.
+- **Honest Data Boundaries:** The demonstration delay estimator transparently reports data provenance: surveillance tracks and 2° grid weather are operational historical data, while turnaround schedules and queue holds are demonstration models until airport A-CDM/DCS feeds are connected.
+
 ---
 
 ## 4. Machine Learning Models & Evaluation

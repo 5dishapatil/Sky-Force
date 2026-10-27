@@ -5,6 +5,7 @@ import {
   BarChart3,
   BookOpen,
   ChevronRight,
+  Clock,
   Database,
   FlaskConical,
   FolderGit2,
@@ -43,6 +44,7 @@ const navigationGroups = [
   {
     label: 'INTELLIGENCE',
     items: [
+      { id: 'delay-intelligence', label: 'Flight Delay AI', icon: Clock },
       { id: 'congestion', label: 'Congestion AI', icon: BarChart3 },
       { id: 'evaluation', label: 'Model Evaluation', icon: FlaskConical },
     ],
@@ -126,7 +128,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, systemS
             </div>
           )}
         </div>
-        <div className="sidebar-build-label">V1.0 · ACADEMIC PROTOTYPE</div>
+        <div className="sidebar-build-label">V2.0 · MULTI-ROLE PLATFORM</div>
       </div>
     </aside>
   );

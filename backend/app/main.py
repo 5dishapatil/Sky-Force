@@ -13,6 +13,7 @@ from app.api.routes import (
     conflicts,
     congestion,
     datasets,
+    delay,
     experiments,
     explanation,
     health,
@@ -79,7 +80,7 @@ app = FastAPI(
         "DISCLAIMER: Research prototype for simulation and decision support. "
         "Not approved for operational flight planning, navigation, or air traffic control."
     ),
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -110,7 +111,7 @@ app.include_router(experiments.router, prefix=api_prefix)
 app.include_router(models.router, prefix=api_prefix)
 app.include_router(datasets.router, prefix=api_prefix)
 app.include_router(explanation.router, prefix=api_prefix)
-
+app.include_router(delay.router, prefix=api_prefix)
 
 
 @app.get("/")
@@ -118,7 +119,7 @@ def root():
     return {
         "project": "Sky Force",
         "description": "AI-Driven Framework for Predictive Airspace Analysis, Explainable Route Optimisation, and Dynamic Rerouting",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "documentation": "/docs",
         "health": "/api/health",
         "disclaimer": "Research prototype for simulation and decision support. Not approved for operational flight planning, navigation, or air traffic control.",

@@ -361,3 +361,131 @@ export interface WeatherObservationItem {
   is_synthetic?: boolean;
 }
 
+
+// --- Sky Force 2.0: Flight Delay Intelligence & Passenger Types ---
+
+export type EvidenceStatus = 'CONFIRMED' | 'MODEL_INFERRED' | 'UNAVAILABLE' | 'NOT_APPLICABLE';
+export type FlightDelayStatus = 'ON_SCHEDULE' | 'DELAY_LIKELY' | 'SIGNIFICANT_DELAY_LIKELY' | 'DEPARTURE_UNCERTAIN' | 'CANCELLED';
+export type UserRole = 'passenger' | 'operations';
+
+export interface DelayContributingFactor {
+  name: string;
+  category: string;
+  impact_minutes: number;
+  evidence_status: EvidenceStatus;
+  description: string;
+  source: string;
+}
+
+export interface OperationalStage {
+  stage_number: number;
+  stage_id: string;
+  stage_name: string;
+  status: 'COMPLETED' | 'ACTIVE' | 'PROJECTED' | 'DELAYED' | 'UNAVAILABLE';
+  timestamp_utc?: string | null;
+  time_display: string;
+  evidence_status: EvidenceStatus;
+  source: string;
+  explanation: string;
+  is_confirmed: boolean;
+}
+
+export interface FlightSummary {
+  flight_id: string;
+  flight_number: string;
+  callsign: string;
+  airline: string;
+  aircraft_tail: string;
+  origin_id: string;
+  origin_iata: string;
+  origin_name: string;
+  destination_id: string;
+  destination_iata: string;
+  destination_name: string;
+  scheduled_departure_utc: string;
+  estimated_departure_utc: string;
+  scheduled_departure_display: string;
+  estimated_departure_display: string;
+  predicted_delay_minutes: number;
+  delay_interval_min: number;
+  delay_interval_max: number;
+  status: FlightDelayStatus;
+  severity: 'NOMINAL' | 'MODERATE' | 'HIGH';
+  confidence_score: number;
+  confidence_label: 'HIGH' | 'MEDIUM' | 'LOW';
+  data_source: string;
+  is_demonstration: boolean;
+  last_updated_utc: string;
+}
+
+export interface FlightDetail extends FlightSummary {
+  estimated_gate_departure_utc: string;
+  estimated_takeoff_utc: string;
+  scheduled_arrival_utc: string;
+  estimated_arrival_utc: string;
+  taxi_time_minutes: number;
+  enroute_time_minutes: number;
+  inbound_aircraft_id?: string | null;
+  inbound_flight_callsign?: string | null;
+  inbound_arrival_utc?: string | null;
+  inbound_delay_minutes: number;
+  turnaround_buffer_minutes: number;
+  factors: DelayContributingFactor[];
+  timeline: OperationalStage[];
+  departure_weather_summary: Record<string, any>;
+  departure_queue_size: number;
+  enroute_distance_km: number;
+  enroute_corridor_congestion: string;
+  explanation_plain_english: string;
+  alternative_flights: FlightSummary[];
+}
+
+export interface FlightSearchResponse {
+  total: number;
+  page: number;
+  page_size: number;
+  flights: FlightSummary[];
+}
+
+export interface AlternativeFlightsResponse {
+  flight_id: string;
+  origin_iata: string;
+  destination_iata: string;
+  alternatives: FlightSummary[];
+}
+
+export interface DelayPredictionRequest {
+  flight_id: string;
+  inbound_delay_minutes?: number | null;
+  departure_queue_additional?: number;
+  weather_severity_override?: number | null;
+  slot_delay_minutes?: number;
+}
+
+export interface DelayDashboardResponse {
+  total_flights_monitored: number;
+  on_time_count: number;
+  moderate_delay_count: number;
+  significant_delay_count: number;
+  average_predicted_delay_min: number;
+  flights_requiring_attention: FlightSummary[];
+  factor_breakdown: Record<string, number>;
+  delay_distribution: { bracket: string; count: number; percentage: number }[];
+  model_readiness: Record<string, any>;
+  generated_at_utc: string;
+}
+
+export interface DataReadinessReport {
+  status: string;
+  model_type: string;
+  current_capabilities: string[];
+  missing_operational_labels: {
+    field: string;
+    category: string;
+    importance: string;
+    status: string;
+    reason: string;
+  }[];
+  requirements_for_production: string[];
+  disclaimer: string;
+}

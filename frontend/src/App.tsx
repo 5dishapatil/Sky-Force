@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, AlertCircle, ArrowUpRight, BookOpen, Database, HelpCircle, ShieldAlert } from 'lucide-react';
+import { Activity, AlertCircle, ArrowUpRight, BookOpen, Clock, Database, HelpCircle, ShieldAlert } from 'lucide-react';
 import { Header, tabLabels } from './components/Header';
+import { RoleSwitcher } from './components/RoleSwitcher';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { OverviewView } from './views/OverviewView';
 import { AirspaceExplorerView } from './views/AirspaceExplorerView';
@@ -12,8 +13,10 @@ import { DataQualityView } from './views/DataQualityView';
 import { DocumentationView } from './views/DocumentationView';
 import { DatasetStudioView } from './views/DatasetStudioView';
 import { DatasetExplorerView } from './views/DatasetExplorerView';
+import { FlightDelayIntelligenceView } from './views/FlightDelayIntelligenceView';
+import { PassengerPortalView } from './views/passenger/PassengerPortalView';
 import { api } from './services/api';
-import type { Airport, AirspaceNetwork, Scenario, ModelsStatusResponse, CongestionCell } from './types';
+import type { Airport, AirspaceNetwork, Scenario, ModelsStatusResponse, CongestionCell, UserRole } from './types';
 
 interface SystemStatus {
   status: string;
@@ -36,6 +39,10 @@ async function settle<T>(request: Promise<T>): Promise<LoadResult<T>> {
 }
 
 export function App() {
+  const [userRole, setUserRole] = useState<UserRole>(() => {
+    return (localStorage.getItem('skyforce_role') as UserRole) || 'operations';
+  });
+
   const [activeTab, setActiveTab] = useState('overview');
   const [activeDatasetId, setActiveDatasetId] = useState<string>('synthetic_demo_v1');
   const [systemStatus, setSystemStatus] = useState<SystemStatus>({ status: 'CHECKING', database: 'Unknown' });
@@ -47,6 +54,12 @@ export function App() {
   const [aircraft, setAircraft] = useState<Record<string, unknown>[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [loadWarning, setLoadWarning] = useState<string | null>(null);
+
+  // Sync role to localStorage
+  const handleRoleChange = (role: UserRole) => {
+    setUserRole(role);
+    localStorage.setItem('skyforce_role', role);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -126,6 +139,51 @@ export function App() {
   const activeTitle = tabLabels[activeTab] || 'Mission Control';
   const isHealthy = ['ok', 'online', 'healthy', 'operational'].includes((systemStatus.status || '').toLowerCase());
 
+  // =========================================================================
+  // PASSENGER ROLE VIEW
+  // =========================================================================
+  if (userRole === 'passenger') {
+    return (
+      <div className="min-h-screen bg-aerospace-950 text-slate-100 flex flex-col font-sans">
+        {/* Passenger Header */}
+        <header className="border-b border-aerospace-800 bg-aerospace-900/90 backdrop-blur px-6 py-3.5 flex items-center justify-between sticky top-0 z-40">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-600 to-blue-600 flex items-center justify-center text-white shadow-sm font-bold">
+              SF
+            </div>
+            <div>
+              <div className="text-sm font-black font-mono tracking-wider text-white">SKY FORCE</div>
+              <div className="text-[10px] text-cyan-400 font-mono">PASSENGER DELAY ASSISTANT</div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <RoleSwitcher currentRole={userRole} onRoleChange={handleRoleChange} />
+          </div>
+        </header>
+
+        {/* Passenger Main Body */}
+        <main className="flex-1 p-6">
+          <PassengerPortalView
+            onSwitchToOperations={() => handleRoleChange('operations')}
+            onInspectRouteInOperations={(orig, dest) => {
+              handleRoleChange('operations');
+              setActiveTab('routing');
+            }}
+          />
+        </main>
+
+        <footer className="border-t border-aerospace-800 px-6 py-4 text-xs text-slate-400 flex flex-wrap items-center justify-between gap-2">
+          <span>Sky Force 2.0 · Passenger Flight Delay Intelligence Platform</span>
+          <span>Academic Demonstration Prototype · Not for certified commercial dispatch</span>
+        </footer>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // AVIATION OPERATIONS CONSOLE VIEW
+  // =========================================================================
   return (
     <div className="app-shell">
       <Header activeTab={activeTab} setActiveTab={setActiveTab} systemStatus={systemStatus} />
@@ -133,10 +191,13 @@ export function App() {
       <div className="app-main-column">
         <header className="app-topbar">
           <div className="topbar-context">
-            <p className="eyebrow">SKY FORCE <span className="breadcrumb-slash">/</span> RESEARCH WORKSPACE</p>
+            <p className="eyebrow">SKY FORCE <span className="breadcrumb-slash">/</span> AVIATION OPERATIONS</p>
             <h1>{activeTitle}</h1>
           </div>
           <div className="topbar-meta">
+            {/* Role Switcher in Topbar */}
+            <RoleSwitcher currentRole={userRole} onRoleChange={handleRoleChange} />
+
             <button
               type="button"
               onClick={() => setActiveTab('docs')}
@@ -146,6 +207,7 @@ export function App() {
               <BookOpen size={13} className="text-cyan-400" />
               <span>Operator Guide</span>
             </button>
+
             <div className={`connection-pill ${isHealthy ? 'is-good' : systemStatus.status === 'CHECKING' ? 'is-pending' : 'is-warning'}`}>
               <span className="status-indicator" />
               <span>{isHealthy ? 'API connected' : systemStatus.status === 'CHECKING' ? 'Checking API' : 'API degraded'}</span>
@@ -182,6 +244,13 @@ export function App() {
                 onNavigate={setActiveTab}
               />
             )}
+            {activeTab === 'delay-intelligence' && (
+              <FlightDelayIntelligenceView
+                onInspectRoute={(orig, dest) => {
+                  setActiveTab('routing');
+                }}
+              />
+            )}
             {activeTab === 'studio' && (
               <DatasetStudioView
                 activeDatasetId={activeDatasetId}
@@ -213,8 +282,8 @@ export function App() {
         </main>
 
         <footer className="app-footer">
-          <span><Activity size={13} /> Sky Force · AI-driven airspace analysis</span>
-          <span>Academic prototype · Not for operational use</span>
+          <span><Activity size={13} /> Sky Force 2.0 · Multi-role Aviation Decision Support</span>
+          <span>Academic prototype · Not for operational air traffic control</span>
         </footer>
       </div>
     </div>

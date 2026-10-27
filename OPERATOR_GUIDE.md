@@ -41,10 +41,10 @@ When you open [http://localhost:5173](http://localhost:5173), follow this sequen
                                                                │
                                                                ▼
 ┌─────────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
-│ 05 · AI INTEL   │ <── │ 04 · ROUTE          │ <───┘                     │
-│     & METRICS   │     │     OPTIMIZATION    │                           │
-│ Explain & Verify│     │ A* & Pareto Frontier│                           │
-└─────────────────┘     └─────────────────────┘                           │
+│ 06 · DELAY AI   │ <── │ 05 · AI INTEL       │ <── │ 04 · ROUTE          │
+│   & PASSENGER   │     │     & METRICS       │     │     OPTIMIZATION    │
+│ Multi-Role Hub  │     │ Explain & Verify    │     │ A* & Pareto Frontier│
+└─────────────────┘     └─────────────────────┘     └─────────────────────┘
 ```
 
 ---
@@ -117,6 +117,20 @@ When you open [http://localhost:5173](http://localhost:5173), follow this sequen
 
 ---
 
+### Step 6: Flight Delay Intelligence & Passenger Experience (Sky Force 2.0)
+- **Role Switcher:** Use the role switch in the top header or banner to toggle between:
+  1. **Passenger Portal:** Plain-language flight status, calibrated delay intervals, 8-stage operational progress, transparent evidence tags (Confirmed, Model-inferred, Unavailable), and alternative flights.
+  2. **Operations Console (`delay-intelligence`):** Fleet-level delay distribution, deep-dive flight inspector, what-if scenario simulator, Route Lab connection, and Data Readiness Report.
+- **Key Actions in Flight Delay Intelligence:**
+  1. **Select a Flight:** Choose from active flight tracks or filter by status (`All`, `Delayed > 15m`, `High Uncertainty`).
+  2. **Inspect Contributing Factors Waterfall:** Trace how inbound delay, ground turnaround deficit, airport departure queue, departure weather, and en-route convective weather contribute to the expected delay.
+  3. **8-Stage Operational Progress:** Trace the flight through chronological milestones: Inbound Aircraft Turnaround -> Flight Dispatch -> Passenger Boarding -> Gate Pushback -> Taxi-Out -> Runway Takeoff -> En-Route Flight -> Arrival.
+  4. **Run What-If Operational Simulation:** Adjust inbound delay (+/- min), airport queue size, weather severity, or ATC departure slot holds to see real-time impact on departure delay, taxi duration, and takeoff time.
+  5. **Bridge to Route Lab:** Click **"Open Route Lab for this Flight"** to load the flight's origin and destination directly into the Multi-Objective Route Optimization solver.
+  6. **Inspect Data Readiness:** Click **"Data Readiness & Production Gap Report"** to review the honest audit of which inputs are operational telemetry vs simulated proxies.
+
+---
+
 ## 3. Academic Defense & Viva Quick Reference
 
 Accessible via **Operator Guide & Docs** (`docs`) in the sidebar:
@@ -125,6 +139,7 @@ Accessible via **Operator Guide & Docs** (`docs`) in the sidebar:
 - **RQ3 (Multi-Objective Routing):** Storm avoidance routes aircraft around cells with only +3.8% to +7.2% distance overhead.
 - **RQ4 (Admissible A* Heuristic):** Scaled Haversine spherical distance guarantees $h(n) \le c^*(n)$ without overestimating true costs.
 - **RQ5 (Hard Closures):** Closed corridors are strictly removed from graph candidate edges, preventing unsafe penetrations.
+- **RQ6 (Event Target Separation):** Gate off-block pushback delay ($STD \to \text{Off-Block}$) is strictly distinguished from runway take-off time ($STD + \text{Taxi-Out} + \text{QueueHold}$). Route optimization optimizes en-route airborne flight time ($t_\text{air}$) but does not retroactively resolve ground turnaround deficits.
 
 ---
 
@@ -138,4 +153,11 @@ Accessible via **Operator Guide & Docs** (`docs`) in the sidebar:
 | `POST` | `/api/v1/routing/compare` | Compares objectives and returns Pareto frontier |
 | `GET` | `/api/v1/models/status` | Verified SHA-256 hashes and loaded pipeline status |
 | `POST` | `/api/v1/datasets/upload` | Ingests custom CSV telemetry with schema mapping |
+| `GET` | `/api/delay/flights` | Search flight tracks with query, airline, date, origin/destination |
+| `GET` | `/api/delay/flights/{id}` | Detailed flight delay prediction, intervals, and factor decomposition |
+| `GET` | `/api/delay/flights/{id}/timeline` | 8-stage operational chronological departure progress |
+| `GET` | `/api/delay/flights/{id}/alternatives` | Same-day alternative flight options between origin and destination |
+| `POST` | `/api/delay/predict` | What-if scenario simulation across operational stress factors |
+| `GET` | `/api/delay/dashboard` | Fleet-wide delay summary, attention queues, and airport status |
+| `GET` | `/api/delay/readiness` | Comprehensive production data gap & telemetry readiness audit |
 
